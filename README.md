@@ -39,6 +39,10 @@ bash scripts/day_run.sh
 bash scripts/run_beginner_demos.sh
 ```
 
+说明：
+- `source ~/.geoclaw-openai/env.sh` 会自动补齐 Python user bin 到 `PATH`，确保当前终端可直接调用 `geoclaw-openai`。
+- 若未配置真实 `GEOCLAW_OPENAI_API_KEY`，`day_run` 默认会跳过 AI 摘要步骤，仅验证空间分析与制图主链路。可设 `GEOCLAW_OPENAI_DAY_RUN_WITH_AI=1` 强制启用 AI 步骤。
+
 ## Skill 扩展
 
 ```bash

@@ -6,6 +6,11 @@ PYTHON_BIN="${PYTHON:-python3}"
 BBOX="${1:-30.50,114.20,30.66,114.45}"
 
 DEFAULT_OPENAI_KEY="${GEOCLAW_OPENAI_API_KEY:-test-key-for-day-run}"
+DAY_RUN_WITH_AI="${GEOCLAW_OPENAI_DAY_RUN_WITH_AI:-auto}"
+HAS_REAL_API_KEY=0
+if [ -n "${GEOCLAW_OPENAI_API_KEY:-}" ] && [ "${GEOCLAW_OPENAI_API_KEY}" != "test-key-for-day-run" ]; then
+  HAS_REAL_API_KEY=1
+fi
 QGIS_BIN="${GEOCLAW_OPENAI_QGIS_PROCESS:-}"
 if [ -z "${QGIS_BIN}" ]; then
   if [ -x "/Applications/QGIS.app/Contents/MacOS/bin/qgis_process" ]; then
@@ -69,8 +74,21 @@ bash scripts/run_wuhan_case.sh "${BBOX}"
 echo "[DAY-RUN] 6/8 skill: location_analysis"
 "${CLI_BIN}" skill -- --skill location_analysis --skip-download
 
-echo "[DAY-RUN] 7/8 skill: site_selection + ai summary"
-"${CLI_BIN}" skill -- --skill site_selection --skip-download --with-ai --ai-input "day-run smoke check"
+if [ "${DAY_RUN_WITH_AI}" = "1" ] || [ "${DAY_RUN_WITH_AI}" = "true" ]; then
+  ENABLE_AI=1
+elif [ "${DAY_RUN_WITH_AI}" = "0" ] || [ "${DAY_RUN_WITH_AI}" = "false" ]; then
+  ENABLE_AI=0
+else
+  ENABLE_AI="${HAS_REAL_API_KEY}"
+fi
+
+if [ "${ENABLE_AI}" = "1" ]; then
+  echo "[DAY-RUN] 7/8 skill: site_selection + ai summary"
+  "${CLI_BIN}" skill -- --skill site_selection --skip-download --with-ai --ai-input "day-run smoke check"
+else
+  echo "[DAY-RUN] 7/8 skill: site_selection (skip ai summary; no real API key)"
+  "${CLI_BIN}" skill -- --skill site_selection --skip-download
+fi
 
 echo "[DAY-RUN] 8/8 validate key outputs"
 for f in \

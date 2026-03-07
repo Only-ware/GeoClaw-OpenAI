@@ -240,7 +240,8 @@ bash scripts/day_run.sh
 
 说明：
 
-- 若使用测试 API key，`--with-ai` 会返回 401 告警，这是预期行为，不影响空间流程主链路。
+- 若未提供真实 `GEOCLAW_OPENAI_API_KEY`，day-run 默认跳过 AI 摘要步骤，只验证空间流程主链路。
+- 可通过 `GEOCLAW_OPENAI_DAY_RUN_WITH_AI=1` 强制启用 AI 摘要步骤（需可用 API key）。
 
 ## 7. 可复现性与科研使用建议
 

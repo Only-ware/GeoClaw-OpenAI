@@ -16,6 +16,8 @@ geoclaw-openai onboard
 source ~/.geoclaw-openai/env.sh
 ```
 
+`env.sh` 会自动把 Python user bin（例如 `/Users/<you>/Library/Python/<ver>/bin`）加入 `PATH`，避免新终端出现 `geoclaw-openai: command not found`。
+
 `onboard` 会写入：
 
 - `~/.geoclaw-openai/config.json`
