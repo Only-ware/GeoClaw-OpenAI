@@ -172,6 +172,18 @@ bash scripts/run_beginner_demos.sh
 - `pipelines/examples/vector_basics.yaml`
 - `pipelines/examples/raster_basics.yaml`
 
+### 5.6 自然语言入口（nl）
+
+```bash
+# 预览自然语言解析结果
+geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
+
+# 直接执行解析结果
+geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
+```
+
+说明：`nl` 当前可解析并转发到 `run`、`operator`、`skill`、`memory`、`update`。
+
 ## 6. 区位分析说明
 
 `pipelines/cases/location_analysis.yaml` 输出以下关键字段：

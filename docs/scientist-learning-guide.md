@@ -107,6 +107,18 @@ geoclaw-openai operator \
   --params-file configs/examples/operator_buffer_params.yaml
 ```
 
+## 5.3 自然语言操作（nl）
+
+```bash
+# 默认只预览，不执行
+geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
+
+# 确认后执行
+geoclaw-openai nl "用武汉市做选址分析，前20个，出图" --execute
+```
+
+当前自然语言入口可解析：`run`、`operator`、`skill`、`memory`、`update`。
+
 ## 6. Python API（研究代码中调用）
 
 ```python

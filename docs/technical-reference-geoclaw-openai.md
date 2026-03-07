@@ -11,6 +11,7 @@
 - 原生区位分析与选址分析能力
 - 标准化专题图导出能力
 - 可扩展的 Skill 机制与外部 AI API 接入能力
+- 自然语言到命令计划的执行入口（`geoclaw-openai nl`）
 
 核心思想：将“数据下载 -> 空间分析 -> 结果制图 -> AI 解释”串联为可自动化、可审计、可扩展的工程流程。
 
@@ -51,6 +52,7 @@ AI-Agents/
 │   ├── cli/main.py                         # geoclaw-openai CLI
 │   ├── config.py                           # 运行时配置与环境变量
 │   ├── memory/store.py                     # 短期/长期 memory 存储与复盘
+│   ├── nl/intent.py                        # 自然语言到 CLI 计划解析
 │   ├── core/                               # Pipeline/Step 数据结构
 │   ├── providers/                          # qgis_process provider
 │   ├── skills/                             # Skill 模型与注册
@@ -178,6 +180,14 @@ AI-Agents/
 - `geoclaw-openai update --check-only`：检查 `origin/main` 是否有更新。
 - `geoclaw-openai update`：拉取最新代码并执行 editable 安装刷新本地 CLI。
 
+## 3.7 自然语言操作层（NL）
+
+`geoclaw-openai nl "<自然语言>"` 会先解析成标准 CLI 计划并输出 `command_preview`。
+
+- 默认仅预览，不执行。
+- 增加 `--execute` 后执行解析出的目标命令。
+- 当前覆盖 `run` / `operator` / `skill` / `memory` / `update` 典型任务。
+
 ## 4. 配置与环境变量
 
 通过 `geoclaw-openai onboard` 写入 `~/.geoclaw-openai/`：
@@ -244,6 +254,10 @@ geoclaw-openai memory long --limit 5
 
 # 自更新
 geoclaw-openai update --check-only
+
+# 自然语言（预览 + 执行）
+geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
+geoclaw-openai nl "用武汉市做选址分析，前20个，出图" --execute
 ```
 
 ## 5.4 日常回归（day-run）

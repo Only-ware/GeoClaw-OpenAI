@@ -12,6 +12,7 @@
 - Skill 扩展机制（注册表 + 外部 AI API 输入）
 - 任务记忆系统（短期 memory + 自动复盘长期 memory）
 - 自检更新与一键拉取最新版本（`update`）
+- 自然语言操作入口（`nl`）
 - 本地环境检测（QGIS CLI / PyQGIS / GDAL）
 - 栅格/矢量教学 demo 与单算法灵活运行（`operator`）
 
@@ -59,6 +60,12 @@ geoclaw-openai memory status
 
 # 检查是否有新版本
 geoclaw-openai update --check-only
+
+# 自然语言预览（默认不执行）
+geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
+
+# 自然语言直接执行
+geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 ```
 
 外部 AI API 需设置：

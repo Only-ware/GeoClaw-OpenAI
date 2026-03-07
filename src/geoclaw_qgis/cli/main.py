@@ -21,6 +21,7 @@ from geoclaw_qgis.config import (
     write_env_sh,
 )
 from geoclaw_qgis.memory import TaskMemoryStore
+from geoclaw_qgis.nl import NLPlan, parse_nl_query
 from geoclaw_qgis.project_info import LAB_AFFILIATION, PROJECT_NAME, PROJECT_VERSION
 
 
@@ -336,6 +337,37 @@ def cmd_memory_review(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_nl(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    query_text = " ".join(args.query).strip()
+    if not query_text:
+        raise ValueError("query text is required")
+
+    plan: NLPlan = parse_nl_query(query_text)
+    payload = {
+        "query": plan.query,
+        "intent": plan.intent,
+        "confidence": plan.confidence,
+        "reasons": plan.reasons,
+        "command_preview": "geoclaw-openai " + " ".join(plan.cli_args),
+        "cli_args": plan.cli_args,
+        "execute": bool(args.execute),
+    }
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+
+    if not args.execute:
+        print("[NL] 预览模式：加 --execute 将执行上述命令。")
+        return 0
+
+    current_cli = Path(sys.argv[0]).expanduser()
+    if current_cli.exists() and current_cli.is_file() and "geoclaw-openai" in current_cli.name:
+        cmd = [str(current_cli), *plan.cli_args]
+    else:
+        cmd = [os.environ.get("PYTHON", "python3"), "-m", "geoclaw_qgis.cli.main", *plan.cli_args]
+    proc = subprocess.run(cmd, check=False)
+    return int(proc.returncode)
+
+
 def cmd_skill(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
     cmd = build_runner_cmd("geoclaw_skill_runner.py")
@@ -505,6 +537,11 @@ def build_parser() -> argparse.ArgumentParser:
     mem_review.add_argument("--lesson", action="append", default=[], help="repeatable lesson item")
     mem_review.add_argument("--action", action="append", default=[], help="repeatable next action item")
     mem_review.set_defaults(func=cmd_memory_review)
+
+    nl = sub.add_parser("nl", help="run geoclaw-openai from natural language")
+    nl.add_argument("query", nargs="+", help="natural language request text")
+    nl.add_argument("--execute", action="store_true", help="execute parsed command immediately")
+    nl.set_defaults(func=cmd_nl)
 
     return parser
 

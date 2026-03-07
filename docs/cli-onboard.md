@@ -44,6 +44,7 @@ geoclaw-openai env
 geoclaw-openai skill -- --list
 geoclaw-openai memory status
 geoclaw-openai update --check-only
+geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
 
 # 按城市名运行内置案例
 geoclaw-openai run --case native_cases --city "武汉市"
@@ -56,6 +57,10 @@ geoclaw-openai run --case site_selection --data-dir data/raw/wuhan_osm --skip-do
 
 # 单算法灵活运行
 geoclaw-openai operator --algorithm native:buffer --params-file configs/examples/operator_buffer_params.yaml
+
+# 自然语言执行（先预览，后执行）
+geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析"
+geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 ```
 
 `geoclaw-openai run --help` 可查看全部参数（`--tag`、`--out-root`、`--with-maps` 等）。
