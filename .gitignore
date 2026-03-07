@@ -4,6 +4,7 @@ __pycache__/
 
 # local artifacts
 data/
+third_party_trackintel_ref/
 
 *.egg-info/
 .eggs/

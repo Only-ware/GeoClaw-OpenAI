@@ -46,7 +46,7 @@ class TestTrackintelNetworkService(unittest.TestCase):
             self.skipTest("optional network dependencies are not installed")
 
         root = Path(__file__).resolve().parents[3]
-        demo_csv = root / "data" / "examples" / "trackintel_demo_pfs.csv"
+        demo_csv = root / "data" / "examples" / "trajectory" / "trackintel_demo_pfs.csv"
         if not demo_csv.exists():
             self.skipTest("demo positionfix csv not found")
 

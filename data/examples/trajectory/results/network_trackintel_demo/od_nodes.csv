@@ -1,0 +1,4 @@
+location_id,in_degree,out_degree,in_strength,out_strength,total_strength,degree_centrality,betweenness_centrality,community_id,staypoint_count,lon,lat
+0,0,1,0.0,1.0,1.0,0.5,0.0,0,1,114.30002200000001,30.540022
+1,2,0,2.0,0.0,2.0,1.0,0.0,0,2,114.320462,30.544471000000005
+2,0,1,0.0,1.0,1.0,0.5,0.0,0,1,114.298012,30.53802

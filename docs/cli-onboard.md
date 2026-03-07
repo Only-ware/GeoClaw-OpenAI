@@ -1,4 +1,4 @@
-# GeoClaw CLI 安装与 Onboard（v2.0.0）
+# GeoClaw CLI 安装与 Onboard（v2.1.0）
 
 ## 1) 安装
 
@@ -45,7 +45,7 @@ geoclaw-openai skill -- --list
 geoclaw-openai memory status
 geoclaw-openai update --check-only
 geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
-geoclaw-openai network --pfs-csv data/examples/trackintel_demo_pfs.csv --out-dir data/outputs/network_trackintel_demo --activity-time-threshold 5 --location-epsilon 80 --location-min-samples 1 --location-agg-level dataset
+geoclaw-openai network --pfs-csv data/examples/trajectory/trackintel_demo_pfs.csv --out-dir data/examples/trajectory/results/network_trackintel_demo --activity-time-threshold 5 --location-epsilon 80 --location-min-samples 1 --location-agg-level dataset
 
 # 按城市名运行内置案例
 geoclaw-openai run --case native_cases --city "武汉市"
@@ -61,8 +61,8 @@ geoclaw-openai operator --algorithm native:buffer --params-file configs/examples
 
 # 复杂网络分析（trackintel）
 geoclaw-openai network \
-  --pfs-csv data/examples/trackintel_demo_pfs.csv \
-  --out-dir data/outputs/network_trackintel_demo \
+  --pfs-csv data/examples/trajectory/trackintel_demo_pfs.csv \
+  --out-dir data/examples/trajectory/results/network_trackintel_demo \
   --activity-time-threshold 5 \
   --location-epsilon 80 \
   --location-min-samples 1 \
@@ -109,6 +109,9 @@ geoclaw-openai update
 ```
 
 ## 7) 复杂网络分析（Trackintel）
+
+算法来源说明：轨迹处理链路基于 [Track-Intel（MIE Lab）](https://github.com/mie-lab/trackintel)。
+测试数据目录：`data/examples/trajectory/`。
 
 可选依赖安装：
 

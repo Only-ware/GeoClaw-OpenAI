@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 科研学习手册（v2.0.0）
+# GeoClaw-OpenAI 科研学习手册（v2.1.0）
 
 适用对象：科研人员、研究生、GIS 初学者  
 项目归属：UrbanComp Lab @ China University of Geosciences (Wuhan)
@@ -8,6 +8,7 @@
 - 按城市名或 bbox 快速获取 OSM 数据并开展空间分析
 - 同时完成矢量与栅格分析流程
 - 用统一 CLI 运行内置案例（区位分析、选址分析）
+- 基于轨迹数据开展 OD 复杂网络分析（Trackintel）
 - 用灵活参数定义方式（命令行、JSON、YAML）运行单算法或 pipeline
 
 ## 2. 最小可运行路径（初学者）
@@ -117,7 +118,18 @@ geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
 geoclaw-openai nl "用武汉市做选址分析，前20个，出图" --execute
 ```
 
-当前自然语言入口可解析：`run`、`operator`、`skill`、`memory`、`update`。
+当前自然语言入口可解析：`run`、`operator`、`network`、`skill`、`memory`、`update`。
+
+## 5.4 轨迹数据复杂网络 demo
+
+```bash
+bash scripts/run_trackintel_network_demo.sh
+```
+
+测试数据：`data/examples/trajectory/trackintel_demo_pfs.csv`  
+demo 结果：`data/examples/trajectory/results/network_trackintel_demo/`
+
+算法来源说明：轨迹处理主链路来自 [Track-Intel（MIE Lab）](https://github.com/mie-lab/trackintel)。
 
 ## 6. Python API（研究代码中调用）
 

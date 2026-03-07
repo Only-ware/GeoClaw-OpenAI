@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 技术参考（科研与团队版，v2.0.0）
+# GeoClaw-OpenAI 技术参考（科研与团队版，v2.1.0）
 
 更新时间：2026-03-07（Asia/Shanghai）  
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
@@ -25,6 +25,7 @@ AI-Agents/
 │   ├── thematic_maps.yaml                  # 专题图模板
 │   └── examples/                           # 参数覆盖与 operator 示例参数
 ├── data/
+│   ├── examples/trajectory/                # 轨迹测试数据与 demo 结果
 │   ├── raw/wuhan_osm/                      # OSM 原始数据
 │   └── outputs/                            # 分析结果与地图输出
 ├── docs/
@@ -201,6 +202,17 @@ AI-Agents/
 4. 计算网络指标：度、强度、中心性、社群。
 5. 导出 `od_edges.csv`、`od_nodes.csv`、`od_trips.csv`、`network_summary.json`。
 
+算法来源说明：轨迹处理核心算法来源于 [Track-Intel（MIE Lab）](https://github.com/mie-lab/trackintel)。
+内置测试数据位置：`data/examples/trajectory/trackintel_demo_pfs.csv`。
+基于该测试数据的一次标准 demo 结果（v2.1.0）：
+
+- `positionfixes=40`
+- `staypoints=4`
+- `locations=4`
+- `trips_with_locations=2`
+- `od_edges=2`
+- `od_nodes=3`
+
 该能力为可选依赖，建议安装：
 
 ```bash
@@ -280,8 +292,8 @@ geoclaw-openai nl "用武汉市做选址分析，前20个，出图" --execute
 
 # 复杂网络分析（trackintel）
 geoclaw-openai network \
-  --pfs-csv data/examples/trackintel_demo_pfs.csv \
-  --out-dir data/outputs/network_trackintel_demo \
+  --pfs-csv data/examples/trajectory/trackintel_demo_pfs.csv \
+  --out-dir data/examples/trajectory/results/network_trackintel_demo \
   --activity-time-threshold 5 \
   --location-epsilon 80 \
   --location-min-samples 1 \

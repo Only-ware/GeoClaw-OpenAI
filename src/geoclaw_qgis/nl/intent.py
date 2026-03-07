@@ -202,7 +202,7 @@ def _build_operator_plan(query: str, text: str, text_lower: str) -> NLPlan:
 
 def _build_network_plan(query: str, text: str, text_lower: str) -> NLPlan:
     reasons = ["Detected complex-network/trackintel keywords."]
-    pfs_path = "data/examples/trackintel_demo_pfs.csv"
+    pfs_path = "data/examples/trajectory/trackintel_demo_pfs.csv"
     out_dir = "data/outputs/network_trackintel_nl"
     paths = PATH_HINT_RE.findall(text)
     if len(paths) >= 1:
