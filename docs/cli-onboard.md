@@ -1,4 +1,4 @@
-# GeoClaw CLI 安装与 Onboard（v1.1.0）
+# GeoClaw CLI 安装与 Onboard（v2.0.0）
 
 ## 1) 安装
 

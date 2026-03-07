@@ -93,7 +93,7 @@ def cmd_onboard(args: argparse.Namespace) -> int:
 
     now = dt.datetime.now(dt.timezone.utc).isoformat()
     payload = {
-        "version": "1.1",
+        "version": "2.0",
         "updated_at": now,
         "defaults": {
             "ai_base_url": api_base_url,

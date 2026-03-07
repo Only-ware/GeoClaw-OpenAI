@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 技术参考（科研与团队版，v1.1.0）
+# GeoClaw-OpenAI 技术参考（科研与团队版，v2.0.0）
 
 更新时间：2026-03-07（Asia/Shanghai）  
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)

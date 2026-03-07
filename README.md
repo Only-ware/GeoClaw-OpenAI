@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI (v1.1.0)
+# GeoClaw-OpenAI (v2.0.0)
 
 基于 `qgis_process` 的 GeoClaw 风格地理处理与制图框架。
 

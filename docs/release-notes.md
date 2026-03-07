@@ -1,5 +1,27 @@
 # GeoClaw-OpenAI Release Notes
 
+## v2.0.0 (2026-03-07)
+
+主要迭代：
+
+1. 自然语言操作正式引入
+   - 新增 `geoclaw-openai nl "<query>"`，支持自然语言到 CLI 计划解析。
+   - 默认预览解析结果，`--execute` 可直接执行解析命令。
+   - 覆盖 `run` / `operator` / `skill` / `memory` / `update` 常见场景。
+
+2. 任务记忆闭环增强
+   - 每次任务自动写入短期 memory。
+   - 任务完成后自动复盘并写入长期 memory。
+   - 支持手动复盘：`geoclaw-openai memory review --task-id ...`。
+
+3. 自更新能力工程化
+   - `geoclaw-openai update --check-only` 与 `geoclaw-openai update` 形成标准自更新入口。
+   - 网络不可达时采用降级策略输出 warning，避免流程中断。
+
+4. 文档与版本体系升级
+   - README、技术参考、开发指南、学习手册、CLI 文档同步更新至 v2.0.0。
+   - 包版本与运行时版本统一升级为 `2.0.0`。
+
 ## v1.1.0 (2026-03-07)
 
 主要迭代：
