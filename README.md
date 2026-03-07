@@ -1,133 +1,267 @@
 # GeoClaw-OpenAI (v2.0.0)
 
-基于 `qgis_process` 的 GeoClaw 风格地理处理与制图框架。
+GeoClaw-OpenAI 是一个基于 `QGIS Processing (qgis_process)` 的空间分析与制图框架，面向科研与工程团队，支持从数据获取、分析建模、制图导出到 AI 辅助解释的完整闭环。
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
-## 当前能力
+## 1. 核心能力总览
 
-- `pipeline.yaml` 驱动的可配置空间分析流程
-- 原生区位分析与选址分析案例
-- 专题图模板与批量导出
-- Skill 扩展机制（注册表 + 外部 AI API 输入）
-- 任务记忆系统（短期 memory + 自动复盘长期 memory）
-- 自检更新与一键拉取最新版本（`update`）
-- 自然语言操作入口（`nl`）
-- 本地环境检测（QGIS CLI / PyQGIS / GDAL）
-- 栅格/矢量教学 demo 与单算法灵活运行（`operator`）
+- 空间分析：内置区位分析、选址分析、武汉综合案例（含聚类）。
+- 制图导出：批量专题图导出（PNG）+ QGIS 工程文件（QGZ）。
+- 自然语言操作（重点）：`geoclaw-openai nl "..."` 可将中文任务转换为可执行命令。
+- Skill 扩展（重点）：注册式技能编排，支持 `pipeline` 与 `ai` 两类 skill。
+- 任务记忆 Memory（重点）：每次任务自动记录短期 memory，自动复盘归档长期 memory。
+- 自更新：`geoclaw-openai update` 检查并拉取最新版本。
+- 灵活参数：`run`/`operator` 支持城市名、bbox、本地目录、JSON/YAML 参数覆盖。
 
-## 快速开始
+## 2. 为什么是 v2.0
+
+v2.0.0 聚焦三项能力升级：
+
+- 自然语言入口：让非工程用户也能直接下达 GIS 任务。
+- Skill + AI：把“空间流程”和“解释生成”合并成统一编排能力。
+- Memory：建立任务轨迹、失败复盘、长期经验沉淀机制。
+
+## 3. 安装与初始化
 
 ```bash
 # 1) 环境检测
 bash scripts/check_local_env.sh
 
-# 2) 安装 geoclaw-openai CLI
+# 2) 安装 CLI
 bash scripts/install_geoclaw_openai.sh
 
-# 3) 首次配置（OpenAI API Key、qgis_process、默认参数）
+# 3) 首次配置（API Key / qgis_process / 默认参数）
 geoclaw-openai onboard
 source ~/.geoclaw-openai/env.sh
-
-# 4) 跑原生案例（区位 + 选址）
-bash scripts/run_native_cases.sh
-
-# 5) 批量专题图（武汉综合案例）
-bash scripts/run_wuhan_case.sh
-
-# 6) 日常回归（安装+案例+skill+产物校验）
-bash scripts/day_run.sh
-
-# 7) 初学者栅格/矢量 demo
-bash scripts/run_beginner_demos.sh
 ```
 
 说明：
-- `source ~/.geoclaw-openai/env.sh` 会自动补齐 Python user bin 到 `PATH`，确保当前终端可直接调用 `geoclaw-openai`。
-- 若未配置真实 `GEOCLAW_OPENAI_API_KEY`，`day_run` 默认会跳过 AI 摘要步骤，仅验证空间分析与制图主链路。可设 `GEOCLAW_OPENAI_DAY_RUN_WITH_AI=1` 强制启用 AI 步骤。
 
-## Skill 扩展
+- `source ~/.geoclaw-openai/env.sh` 会自动补齐 Python user bin 到 `PATH`。
+- 配置文件位于 `~/.geoclaw-openai/`（`config.json` / `.env` / `env.sh`）。
+
+## 4. 自然语言操作（NL）
+
+### 4.1 预览模式（默认）
 
 ```bash
-# 列出 skills
-geoclaw-openai skill -- --list
-
-# 运行选址 skill，并用外部 AI 做总结
-geoclaw-openai skill -- --skill site_selection --with-ai --ai-input "输出实施优先级"
-
-# 查看 memory 状态（短期/长期）
-geoclaw-openai memory status
-
-# 检查是否有新版本
-geoclaw-openai update --check-only
-
-# 自然语言预览（默认不执行）
 geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
+```
 
-# 自然语言直接执行
+会返回：
+
+- `intent`：识别到的任务类型（如 `run`）。
+- `command_preview`：解析后的 CLI 命令。
+- `cli_args`：结构化参数，可审计、可复用。
+
+### 4.2 执行模式
+
+```bash
 geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 ```
 
-外部 AI API 需设置：
+当前 NL 支持解析并转发到：
+
+- `run`
+- `operator`
+- `skill`
+- `memory`
+- `update`
+
+## 5. Skill 能力
+
+Skill 由 `configs/skills_registry.json` 管理，支持依赖链（`pre_steps`）与 AI 总结。
+
+```bash
+# 查看技能列表
+geoclaw-openai skill -- --list
+
+# 运行区位分析 skill
+geoclaw-openai skill -- --skill location_analysis
+
+# 运行选址 skill，并调用外部 AI 总结
+geoclaw-openai skill -- --skill site_selection --with-ai --ai-input "输出实施优先级"
+```
+
+外部 AI API 相关环境变量：
 
 - `GEOCLAW_OPENAI_BASE_URL`
 - `GEOCLAW_OPENAI_API_KEY`
 - `GEOCLAW_OPENAI_MODEL`
 
-## 关键入口
+## 6. Memory 能力
 
-- 区位案例：`pipelines/cases/location_analysis.yaml`
-- 选址案例：`pipelines/cases/site_selection.yaml`
-- 通用 pipeline 执行器：`scripts/run_qgis_pipeline.py`
-- Skill 运行器：`scripts/geoclaw_skill_runner.py`
-- Skill 注册表：`configs/skills_registry.json`
-- 武汉高级案例：`pipelines/wuhan_geoclaw.yaml`
-- 通用案例运行器：`scripts/geoclaw_case_runner.py`
-- 单算法运行器：`scripts/geoclaw_operator_runner.py`
-- 教学 demo 脚本：`scripts/run_beginner_demos.sh`
+每次 CLI 任务（除 `memory` 命令自身）自动执行：
 
-## 按输入源运行分析（新增）
+1. 写入短期 memory（任务参数、状态、返回码、错误）。
+2. 自动复盘并写入长期 memory（summary / lessons / next_actions）。
 
-支持三种输入方式：
+存储路径：
 
-- 城市名（自动地理编码 -> bbox -> OSM 下载）
-- 经度纬度边界（bbox）
-- 本地数据目录（跳过下载）
+- 短期：`~/.geoclaw-openai/memory/short/*.json`
+- 长期：`~/.geoclaw-openai/memory/long_term.jsonl`
 
-统一命令：
+常用命令：
 
 ```bash
-# 1) 用城市名运行区位+选址
-geoclaw-openai run --case native_cases --city "武汉市"
+# 查看 memory 状态
+geoclaw-openai memory status
 
-# 2) 用 bbox 运行区位分析
-geoclaw-openai run --case location_analysis --bbox "30.50,114.20,30.66,114.45"
+# 查看最近短期任务
+geoclaw-openai memory short --limit 10
 
-# 3) 用本地数据目录运行（目录内需 4 个文件）
-geoclaw-openai run --case site_selection --data-dir data/raw/wuhan_osm --skip-download
+# 查看长期复盘记录
+geoclaw-openai memory long --limit 10
 
-# 4) 单算法灵活运行（参数文件/JSON）
-geoclaw-openai operator --algorithm native:buffer --params-file configs/examples/operator_buffer_params.yaml
+# 手工复盘指定任务（写入长期 memory）
+geoclaw-openai memory review --task-id "<TASK_ID>" --summary "本次实验结论"
 ```
 
-注意：`--city`、`--bbox`、`--data-dir` 三个参数互斥，一次只能使用一种输入源。
+## 7. 标准分析入口（run）
 
-本地数据目录最少包含：
+支持三种输入源（互斥）：
+
+- `--city`：城市名（自动地理编码与数据下载）
+- `--bbox`：经纬度边界（`south,west,north,east`）
+- `--data-dir`：本地数据目录（跳过下载）
+
+```bash
+# 城市名：区位+选址一体化
+geoclaw-openai run --case native_cases --city "武汉市"
+
+# bbox：区位分析
+geoclaw-openai run --case location_analysis --bbox "30.50,114.20,30.66,114.45"
+
+# 本地目录：选址分析
+geoclaw-openai run --case site_selection --data-dir data/raw/wuhan_osm --skip-download
+
+# 高级案例 + 出图
+geoclaw-openai run --case wuhan_advanced --city "武汉市" --with-maps
+```
+
+本地目录最少需要：
 
 - `roads.geojson`
 - `water.geojson`
 - `hospitals.geojson`
 - `study_area.geojson`
 
-## 文档
+## 8. 单算法入口（operator）
 
-- 技术参考（科研与团队）：`docs/technical-reference-geoclaw-openai.md`
-- 科研学习手册（初学者）：`docs/scientist-learning-guide.md`
-- 版本迭代记录：`docs/release-notes.md`
-- v1.0 正式说明书（DOCX）：`GeoClaw-OpenAI_v1.0_工程说明书.docx`
-- 架构设计：`docs/framework-design.md`
+适合快速试验某个 QGIS 算法。
+
+```bash
+# 参数文件方式
+geoclaw-openai operator --algorithm native:buffer --params-file configs/examples/operator_buffer_params.yaml
+
+# 命令行参数方式
+geoclaw-openai operator \
+  --algorithm native:buffer \
+  --param INPUT=data/raw/wuhan_osm/hospitals.geojson \
+  --param-json DISTANCE=1000 \
+  --param OUTPUT=data/outputs/demo_operator/hosp_buffer_1000m.gpkg
+```
+
+## 9. 自更新能力（update）
+
+```bash
+# 仅检查更新
+geoclaw-openai update --check-only
+
+# 拉取并更新（默认 origin/main）
+geoclaw-openai update
+```
+
+说明：网络不可达时会返回 warning 并降级，不会直接导致流程崩溃。
+
+## 10. 一键 Demo 清单（建议按顺序）
+
+### Demo A：自然语言到执行
+
+```bash
+geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
+geoclaw-openai nl "用武汉市做选址分析，前20个，出图" --execute
+```
+
+### Demo B：Skill + AI
+
+```bash
+geoclaw-openai skill -- --skill site_selection --with-ai --ai-input "给出三阶段建设建议"
+```
+
+### Demo C：Memory 复盘
+
+```bash
+geoclaw-openai memory short --limit 5
+geoclaw-openai memory long --limit 5
+```
+
+### Demo D：教学样例
+
+```bash
+bash scripts/run_beginner_demos.sh
+```
+
+### Demo E：日常回归
+
+```bash
+bash scripts/day_run.sh
+```
+
+说明：若未配置真实 `GEOCLAW_OPENAI_API_KEY`，day-run 会默认跳过 AI 总结步骤。可用 `GEOCLAW_OPENAI_DAY_RUN_WITH_AI=1` 强制启用。
+
+## 11. 输出结果与目录
+
+常见输出目录：
+
+- `data/outputs/<tag>_location/`：区位分析结果
+- `data/outputs/<tag>_site/`：选址分析结果
+- `data/outputs/<tag>_analysis/`：综合分析与地图产物
+
+常见关键结果：
+
+- `grid_location.gpkg`
+- `site_candidates.gpkg`
+- `grid_clustered.gpkg`
+- `maps/*.png`
+- `pipeline_report.json`
+
+## 12. 命令速查
+
+```bash
+geoclaw-openai --help
+geoclaw-openai run --help
+geoclaw-openai operator --help
+geoclaw-openai skill -- --help
+geoclaw-openai memory --help
+geoclaw-openai update --help
+geoclaw-openai nl --help
+```
+
+## 13. 关键工程入口
+
+- 区位案例：`pipelines/cases/location_analysis.yaml`
+- 选址案例：`pipelines/cases/site_selection.yaml`
+- 武汉综合案例：`pipelines/wuhan_geoclaw.yaml`
+- 通用 pipeline 执行器：`scripts/run_qgis_pipeline.py`
+- 单算法执行器：`scripts/geoclaw_operator_runner.py`
+- 案例执行器：`scripts/geoclaw_case_runner.py`
+- Skill 运行器：`scripts/geoclaw_skill_runner.py`
+- Skill 注册表：`configs/skills_registry.json`
+- 日常回归脚本：`scripts/day_run.sh`
+
+## 14. 文档导航
+
+- 技术参考：`docs/technical-reference-geoclaw-openai.md`
 - 开发指南：`docs/development-guide.md`
-- CLI 安装与初始化：`docs/cli-onboard.md`
+- 科研学习手册：`docs/scientist-learning-guide.md`
 - 原生案例与 Skill：`docs/native-cases-and-skills.md`
+- CLI 安装与初始化：`docs/cli-onboard.md`
+- 版本记录：`docs/release-notes.md`
 - 武汉流程：`docs/wuhan-osm-workflow.md`
 - 本地环境说明：`docs/local-env-notes.md`
+
+## 15. License
+
+详见 `LICENSE`。
