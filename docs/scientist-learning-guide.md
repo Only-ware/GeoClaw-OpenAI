@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 科研学习手册（v2.3.0）
+# GeoClaw-OpenAI 科研学习手册（v2.3.3）
 
 适用对象：科研人员、研究生、GIS 初学者  
 项目归属：UrbanComp Lab @ China University of Geosciences (Wuhan)
@@ -94,8 +94,16 @@ geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 切换示例：
 
 ```bash
-geoclaw-openai config set --ai-provider gemini --ai-model gemini-2.0-flash
+geoclaw-openai config set --ai-provider openai --ai-model gpt-5.4
+geoclaw-openai config set --ai-provider qwen --ai-model qwen3-max
+geoclaw-openai config set --ai-provider gemini --ai-model gemini-3.1-pro-preview
 ```
+
+模型建议（2026-03-07）：
+
+- OpenAI：`gpt-5.4`、`gpt-5-mini`
+- Gemini：`gemini-3.1-pro-preview`、`gemini-flash-latest`
+- Qwen：`qwen3-max`、`qwen-plus-latest`
 
 长文本上下文会自动压缩，阈值可用 `GEOCLAW_AI_MAX_CONTEXT_CHARS` 调整。
 

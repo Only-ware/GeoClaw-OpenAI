@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "geoclaw-openai"
-version = "2.3.0"
+version = "2.3.3"
 description = "GeoClaw-style geospatial workflows on top of QGIS processing"
 readme = "README.md"
 requires-python = ">=3.10"

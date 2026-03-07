@@ -1,10 +1,10 @@
-# GeoClaw-OpenAI (v2.3.0)
+# GeoClaw-OpenAI (v2.3.3)
 
 GeoClaw-OpenAI 是一个基于 `QGIS Processing (qgis_process)` 的空间分析与制图工具链，面向科研和工程团队，支持从数据获取、分析建模、结果制图到 AI 解释的完整流程。
 
 机构：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
-## 1. v2.3 新增能力（重点）
+## 1. v2.3.3 新增能力（重点）
 
 本次版本重点新增以下能力：
 
@@ -57,19 +57,19 @@ source ~/.geoclaw-openai/env.sh
 geoclaw-openai onboard --non-interactive \
   --ai-provider openai \
   --api-key "<OPENAI_KEY>" \
-  --ai-model "gpt-4.1-mini"
+  --ai-model "gpt-5-mini"
 
 # Qwen
 geoclaw-openai onboard --non-interactive \
   --ai-provider qwen \
   --api-key "<QWEN_KEY>" \
-  --ai-model "qwen-plus"
+  --ai-model "qwen-plus-latest"
 
 # Gemini
 geoclaw-openai onboard --non-interactive \
   --ai-provider gemini \
   --api-key "<GEMINI_KEY>" \
-  --ai-model "gemini-2.0-flash"
+  --ai-model "gemini-flash-latest"
 ```
 
 ## 4. 后期切换模型/Provider（无需重装）
@@ -79,13 +79,44 @@ geoclaw-openai onboard --non-interactive \
 geoclaw-openai config show
 
 # 切换 provider + 模型
-geoclaw-openai config set --ai-provider openai --ai-model gpt-4.1-mini
-geoclaw-openai config set --ai-provider qwen --ai-model qwen-plus
-geoclaw-openai config set --ai-provider gemini --ai-model gemini-2.0-flash
+geoclaw-openai config set --ai-provider openai --ai-model gpt-5.4
+geoclaw-openai config set --ai-provider qwen --ai-model qwen3-max
+geoclaw-openai config set --ai-provider gemini --ai-model gemini-3.1-pro-preview
 
 # 可同时改 base_url / key
 geoclaw-openai config set --ai-provider gemini --ai-base-url "https://generativelanguage.googleapis.com/v1beta/openai" --api-key "<GEMINI_KEY>"
 ```
+
+> GeoClaw-OpenAI 不限制具体模型名：`--ai-model` 可填写任意 provider 当前可用的模型 ID。
+
+## 4.1 可用模型名称（2026-03-07 已核验）
+
+以下模型名来自各官方文档，可直接用于 `--ai-model`：
+
+- OpenAI（官方 models 页）  
+  来源：[OpenAI Models](https://platform.openai.com/docs/models)
+  - `gpt-5.4`
+  - `gpt-5.4-pro`
+  - `gpt-5-mini`
+  - `gpt-5-nano`
+
+- Gemini（Google AI for Developers）  
+  来源：[Gemini Models](https://ai.google.dev/gemini-api/docs/models)
+  - `gemini-3.1-pro-preview`
+  - `gemini-3.1-flash-lite-preview`
+  - `gemini-3-flash-preview`
+  - `gemini-flash-latest`（别名）
+
+- Qwen（阿里云 Model Studio）  
+  来源：[Qwen 模型列表](https://help.aliyun.com/zh/model-studio/models)
+  - `qwen3-max`
+  - `qwen3.5-plus`
+  - `qwen3.5-flash`
+  - `qwen-max-latest` / `qwen-plus-latest` / `qwen-turbo-latest` / `qwen-long-latest`（别名）
+
+建议：
+- 先用 `*-latest` 别名减少文档老化。
+- 追求可复现时，改用固定版本模型名。
 
 ## 5. 自然语言入口
 
@@ -223,7 +254,7 @@ geoclaw-openai update --help
 ## 12. 文档导航
 
 - 技术参考：`docs/technical-reference-geoclaw-openai.md`
-- 全量复盘：`docs/geoclaw-full-retrospective-v2.3.0.md`
+- 全量复盘：`docs/geoclaw-full-retrospective-v2.3.3.md`
 - 开发指南：`docs/development-guide.md`
 - 科研学习手册：`docs/scientist-learning-guide.md`
 - 原生案例与 Skill：`docs/native-cases-and-skills.md`

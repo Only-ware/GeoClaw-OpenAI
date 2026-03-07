@@ -37,7 +37,7 @@ class TestAIProviderAndContext(unittest.TestCase):
             os.environ["GEOCLAW_QWEN_API_KEY"] = "qwen-test-key"
             cfg = ExternalAIConfig.from_env()
             self.assertEqual(cfg.provider, "qwen")
-            self.assertEqual(cfg.model, "qwen-plus")
+            self.assertEqual(cfg.model, "qwen-plus-latest")
             self.assertIn("dashscope.aliyuncs.com", cfg.base_url)
         finally:
             os.environ.clear()
@@ -50,7 +50,7 @@ class TestAIProviderAndContext(unittest.TestCase):
             os.environ["GEOCLAW_GEMINI_API_KEY"] = "gemini-test-key"
             cfg = ExternalAIConfig.from_env()
             self.assertEqual(cfg.provider, "gemini")
-            self.assertEqual(cfg.model, "gemini-2.0-flash")
+            self.assertEqual(cfg.model, "gemini-flash-latest")
             self.assertIn("generativelanguage.googleapis.com", cfg.base_url)
         finally:
             os.environ.clear()

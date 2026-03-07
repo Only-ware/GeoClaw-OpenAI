@@ -1,4 +1,4 @@
-# GeoClaw CLI 安装与 Onboard（v2.3.0）
+# GeoClaw CLI 安装与 Onboard（v2.3.3）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
@@ -30,19 +30,19 @@ source ~/.geoclaw-openai/env.sh
 geoclaw-openai onboard --non-interactive \
   --ai-provider openai \
   --api-key "<OPENAI_KEY>" \
-  --ai-model "gpt-4.1-mini"
+  --ai-model "gpt-5-mini"
 
 # Qwen
 geoclaw-openai onboard --non-interactive \
   --ai-provider qwen \
   --api-key "<QWEN_KEY>" \
-  --ai-model "qwen-plus"
+  --ai-model "qwen-plus-latest"
 
 # Gemini
 geoclaw-openai onboard --non-interactive \
   --ai-provider gemini \
   --api-key "<GEMINI_KEY>" \
-  --ai-model "gemini-2.0-flash"
+  --ai-model "gemini-flash-latest"
 ```
 
 可选参数：`--ai-base-url`、`--qgis-process`、`--default-bbox`、`--registry`、`--workspace`。
@@ -54,9 +54,9 @@ geoclaw-openai onboard --non-interactive \
 geoclaw-openai config show
 
 # 切换 provider / 模型
-geoclaw-openai config set --ai-provider openai --ai-model gpt-4.1-mini
-geoclaw-openai config set --ai-provider qwen --ai-model qwen-plus
-geoclaw-openai config set --ai-provider gemini --ai-model gemini-2.0-flash
+geoclaw-openai config set --ai-provider openai --ai-model gpt-5.4
+geoclaw-openai config set --ai-provider qwen --ai-model qwen3-max
+geoclaw-openai config set --ai-provider gemini --ai-model gemini-3.1-pro-preview
 
 # 一并更新 API key / URL
 geoclaw-openai config set \
@@ -64,6 +64,14 @@ geoclaw-openai config set \
   --ai-base-url "https://generativelanguage.googleapis.com/v1beta/openai" \
   --api-key "<GEMINI_KEY>"
 ```
+
+常用模型名（2026-03-07）：
+
+- OpenAI：`gpt-5.4`、`gpt-5.4-pro`、`gpt-5-mini`、`gpt-5-nano`
+- Gemini：`gemini-3.1-pro-preview`、`gemini-3.1-flash-lite-preview`、`gemini-3-flash-preview`、`gemini-flash-latest`
+- Qwen：`qwen3-max`、`qwen3.5-plus`、`qwen3.5-flash`、`qwen-plus-latest`
+
+说明：`geoclaw-openai` 接受任意 provider 当前有效模型 ID，推荐先使用 `*-latest` 别名，需强复现时再固定具体版本名。
 
 ## 5) 常用命令清单
 

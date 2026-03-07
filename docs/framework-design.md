@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 框架设计（v2.3.0）
+# GeoClaw-OpenAI 框架设计（v2.3.3）
 
 ## 1. 设计目标
 

@@ -47,7 +47,7 @@ onboard_cmd=(
   --non-interactive
   --api-key "${DEFAULT_OPENAI_KEY}"
   --ai-base-url "${GEOCLAW_OPENAI_BASE_URL:-https://api.openai.com/v1}"
-  --ai-model "${GEOCLAW_OPENAI_MODEL:-gpt-4.1-mini}"
+  --ai-model "${GEOCLAW_OPENAI_MODEL:-gpt-5-mini}"
   --default-bbox "${BBOX}"
   --registry "${GEOCLAW_OPENAI_SKILL_REGISTRY:-configs/skills_registry.json}"
   --workspace "${ROOT_DIR}"

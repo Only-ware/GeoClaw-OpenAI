@@ -13,11 +13,11 @@ PROVIDER_OPENAI = "openai"
 PROVIDER_QWEN = "qwen"
 PROVIDER_GEMINI = "gemini"
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
-DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
+DEFAULT_OPENAI_MODEL = "gpt-5-mini"
 DEFAULT_QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-DEFAULT_QWEN_MODEL = "qwen-plus"
+DEFAULT_QWEN_MODEL = "qwen-plus-latest"
 DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
-DEFAULT_GEMINI_MODEL = "gemini-2.0-flash"
+DEFAULT_GEMINI_MODEL = "gemini-flash-latest"
 
 
 @dataclass

@@ -35,15 +35,15 @@ DEFAULT_REGISTRY = "configs/skills_registry.json"
 AI_PROVIDER_PRESETS: dict[str, dict[str, str]] = {
     "openai": {
         "base_url": "https://api.openai.com/v1",
-        "model": "gpt-4.1-mini",
+        "model": "gpt-5-mini",
     },
     "qwen": {
         "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-        "model": "qwen-plus",
+        "model": "qwen-plus-latest",
     },
     "gemini": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
-        "model": "gemini-2.0-flash",
+        "model": "gemini-flash-latest",
     },
 }
 

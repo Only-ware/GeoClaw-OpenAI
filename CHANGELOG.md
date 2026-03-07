@@ -2,6 +2,13 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.3.3] - 2026-03-07
+
+### Changed
+- Bumped project version to `2.3.3`.
+- Updated README and docs model examples/lists to latest model families (GPT-5, Gemini 3.x, Qwen3 series).
+- Synchronized CLI default model presets and day-run defaults with latest naming.
+
 ## [2.1.0] - 2026-03-07
 
 ### Added

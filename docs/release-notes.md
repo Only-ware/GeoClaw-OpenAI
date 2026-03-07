@@ -1,5 +1,17 @@
 # GeoClaw-OpenAI Release Notes
 
+## v2.3.3 (2026-03-07)
+
+主要迭代：
+
+1. 版本升级
+   - 包版本与运行时版本升级为 `2.3.3`。
+
+2. 模型配置与文档同步
+   - README 与 docs 全面更新为最新模型族示例（GPT-5、Gemini 3.x、Qwen3）。
+   - CLI 默认 provider 预设模型更新为：`gpt-5-mini`、`qwen-plus-latest`、`gemini-flash-latest`。
+   - `day_run` 默认模型同步更新为 `gpt-5-mini`。
+
 ## v2.3.0 (2026-03-07)
 
 主要迭代：
