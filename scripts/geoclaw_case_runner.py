@@ -21,6 +21,7 @@ if str(SRC) not in sys.path:
 
 from geoclaw_qgis.config import bootstrap_runtime_env
 from geoclaw_qgis.project_info import LAB_AFFILIATION, PROJECT_ATTRIBUTION, PROJECT_VERSION
+from geoclaw_qgis.security import fixed_output_root
 
 
 DEFAULT_BBOX = "30.50,114.20,30.66,114.45"
@@ -45,7 +46,7 @@ def parse_args() -> argparse.Namespace:
 
     parser.add_argument("--tag", default="", help="output tag; default inferred from input")
     parser.add_argument("--raw-dir", default="", help="download/cache raw data directory")
-    parser.add_argument("--out-root", default="data/outputs", help="root directory for outputs")
+    parser.add_argument("--out-root", default="", help="root directory for outputs (fixed by security policy)")
     parser.add_argument("--top-n", type=int, default=12, help="top candidates for site selection")
     parser.add_argument("--timeout", type=int, default=120, help="download timeout seconds")
     parser.add_argument("--skip-download", action="store_true", help="never download OSM; require local raw files")
@@ -206,10 +207,14 @@ def main() -> int:
     tag = resolve_tag(args)
     raw_dir, chosen_bbox = prepare_raw_data(args, tag)
 
-    if args.out_root == "data/outputs":
-        out_root = (ROOT / "data/outputs").resolve()
-    else:
-        out_root = resolve_user_path(args.out_root)
+    secure_out_root = fixed_output_root(ROOT)
+    requested_out_root = resolve_user_path(args.out_root) if args.out_root else secure_out_root
+    if requested_out_root != secure_out_root:
+        raise ValueError(
+            f"Unsafe --out-root: {requested_out_root}. "
+            f"GeoClaw security policy requires fixed output root: {secure_out_root}"
+        )
+    out_root = secure_out_root
     out_root.mkdir(parents=True, exist_ok=True)
 
     location_out = (out_root / f"{tag}_location").resolve()

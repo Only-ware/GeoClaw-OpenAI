@@ -7,7 +7,6 @@ import argparse
 import json
 import os
 import re
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -20,6 +19,7 @@ if str(SRC) not in sys.path:
 
 from geoclaw_qgis.config import bootstrap_runtime_env
 from geoclaw_qgis.project_info import PROJECT_ATTRIBUTION, PROJECT_VERSION
+from geoclaw_qgis.security import OutputSecurityError, validate_output_targets
 
 try:
     import yaml  # type: ignore
@@ -224,86 +224,12 @@ def resolve_value(value: Any, context: dict[str, Any]) -> str:
     return to_text(value)
 
 
-def _extract_path_candidate(raw: str) -> str:
-    value = raw.strip()
-    if "|" in value and not value.startswith("http"):
-        # QGIS path syntax may append layer options like "x.gpkg|layername=foo".
-        value = value.split("|", 1)[0].strip()
-    return value
-
-
-def _is_special_output(value: str) -> bool:
-    normalized = value.strip()
-    lowered = normalized.lower()
-    if not normalized:
-        return True
-    if normalized == "TEMPORARY_OUTPUT":
-        return True
-    if lowered.startswith("memory:") or lowered.startswith("/vsimem/"):
-        return True
-    if lowered.startswith("http://") or lowered.startswith("https://"):
-        return True
-    if lowered.startswith("dbname=") or lowered.startswith("postgres://"):
-        return True
-    return False
-
-
-def _looks_like_path(value: str) -> bool:
-    lowered = value.lower()
-    if "/" in value or "\\" in value:
-        return True
-    suffixes = (
-        ".gpkg",
-        ".geojson",
-        ".json",
-        ".sqlite",
-        ".db",
-        ".shp",
-        ".tif",
-        ".tiff",
-        ".vrt",
-        ".csv",
-        ".png",
-        ".jpg",
-        ".jpeg",
-        ".svg",
-        ".qgz",
-    )
-    return lowered.endswith(suffixes)
-
-
-def cleanup_existing_outputs(step_id: str, params: dict[str, str]) -> None:
-    input_values = {
-        _extract_path_candidate(v)
-        for k, v in params.items()
-        if "OUTPUT" not in k.upper() and isinstance(v, str)
-    }
-    for key, value in params.items():
-        if "OUTPUT" not in key.upper():
-            continue
-        if _is_special_output(value):
-            continue
-
-        path_text = _extract_path_candidate(value)
-        if not _looks_like_path(path_text):
-            continue
-        if path_text in input_values:
-            # TODO: Add an explicit --allow-inplace mode for algorithms that intentionally mutate input datasets.
-            print(f"[PIPELINE] {step_id}: skip cleanup for in-place output {key}={path_text}")
-            continue
-
-        path = Path(path_text)
-        if not path.is_absolute():
-            path = (ROOT / path).resolve()
-
+def cleanup_existing_outputs(step_id: str, output_paths: dict[str, Path]) -> None:
+    for key, path in output_paths.items():
         path.parent.mkdir(parents=True, exist_ok=True)
-        if path.is_dir():
-            shutil.rmtree(path)
-            print(f"[PIPELINE] {step_id}: removed existing directory output {path}")
-            continue
-        if path.exists():
+        if path.exists() and path.is_file():
             path.unlink()
-            print(f"[PIPELINE] {step_id}: removed existing output {path}")
+            print(f"[PIPELINE] {step_id}: removed existing output {path} ({key})")
 
 
 def run_step(qgis_bin: str, step: dict[str, Any], context: dict[str, Any], dry_run: bool) -> dict[str, Any]:
@@ -317,8 +243,13 @@ def run_step(qgis_bin: str, step: dict[str, Any], context: dict[str, Any], dry_r
     for key, value in raw_params.items():
         params[str(key)] = resolve_value(value, context)
 
+    try:
+        output_paths = validate_output_targets(params, workspace_root=ROOT)
+    except OutputSecurityError as exc:
+        raise RuntimeError(f"step {step_id} failed output security check: {exc}") from exc
+
     if not dry_run:
-        cleanup_existing_outputs(str(step_id), params)
+        cleanup_existing_outputs(str(step_id), output_paths)
 
     command = [qgis_bin, "--json", "run", algorithm, "--"] + [f"{k}={v}" for k, v in params.items()]
     print(f"[PIPELINE] {step_id}: {algorithm}")

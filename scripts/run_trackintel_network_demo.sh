@@ -14,7 +14,7 @@ if ! command -v geoclaw-openai >/dev/null 2>&1; then
 fi
 
 INPUT_CSV="${ROOT_DIR}/data/examples/trajectory/trackintel_demo_pfs.csv"
-OUT_DIR="${ROOT_DIR}/data/examples/trajectory/results/network_trackintel_demo"
+OUT_DIR="${ROOT_DIR}/data/outputs/network_trackintel_demo"
 
 echo "[DEMO] trackintel complex network analysis"
 echo "[DEMO] input=${INPUT_CSV}"

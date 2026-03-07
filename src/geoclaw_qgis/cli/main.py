@@ -14,8 +14,10 @@ from geoclaw_qgis.analysis import TrackintelIntegrationError, TrackintelNetworkS
 from geoclaw_qgis.config import (
     bootstrap_runtime_env,
     detect_qgis_process,
+    env_path,
     env_sh_path,
     geoclaw_home,
+    parse_env_file,
     read_config,
     write_config,
     write_env,
@@ -24,12 +26,26 @@ from geoclaw_qgis.config import (
 from geoclaw_qgis.memory import TaskMemoryStore
 from geoclaw_qgis.nl import NLPlan, parse_nl_query
 from geoclaw_qgis.project_info import LAB_AFFILIATION, PROJECT_NAME, PROJECT_VERSION
+from geoclaw_qgis.security import OutputSecurityError, fixed_output_root, validate_output_targets
 
 
 DEFAULT_BBOX = "30.50,114.20,30.66,114.45"
-DEFAULT_AI_BASE_URL = "https://api.openai.com/v1"
-DEFAULT_AI_MODEL = "gpt-4.1-mini"
+DEFAULT_AI_PROVIDER = "openai"
 DEFAULT_REGISTRY = "configs/skills_registry.json"
+AI_PROVIDER_PRESETS: dict[str, dict[str, str]] = {
+    "openai": {
+        "base_url": "https://api.openai.com/v1",
+        "model": "gpt-4.1-mini",
+    },
+    "qwen": {
+        "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "model": "qwen-plus",
+    },
+    "gemini": {
+        "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
+        "model": "gemini-2.0-flash",
+    },
+}
 
 
 def ask_value(prompt: str, default: str = "") -> str:
@@ -50,8 +66,22 @@ def cmd_onboard(args: argparse.Namespace) -> int:
     defaults = existing.get("defaults") if isinstance(existing.get("defaults"), dict) else {}
     runtime = existing.get("runtime") if isinstance(existing.get("runtime"), dict) else {}
 
-    api_base_url = args.ai_base_url or defaults.get("ai_base_url", DEFAULT_AI_BASE_URL)
-    ai_model = args.ai_model or defaults.get("ai_model", DEFAULT_AI_MODEL)
+    ai_provider = str(args.ai_provider or defaults.get("ai_provider", DEFAULT_AI_PROVIDER)).strip().lower()
+    if ai_provider not in AI_PROVIDER_PRESETS:
+        raise ValueError(f"unsupported --ai-provider: {ai_provider}. choices={sorted(AI_PROVIDER_PRESETS.keys())}")
+
+    provider_defaults = AI_PROVIDER_PRESETS[ai_provider]
+    previous_provider = str(defaults.get("ai_provider", DEFAULT_AI_PROVIDER)).strip().lower() or DEFAULT_AI_PROVIDER
+    api_base_url = args.ai_base_url or str(defaults.get("ai_base_url", "")).strip()
+    ai_model = args.ai_model or str(defaults.get("ai_model", "")).strip()
+    if not api_base_url or (not args.ai_base_url and ai_provider != previous_provider):
+        api_base_url = provider_defaults["base_url"]
+    if not ai_model or (not args.ai_model and ai_provider != previous_provider):
+        ai_model = provider_defaults["model"]
+    if args.ai_provider and not args.ai_base_url:
+        api_base_url = provider_defaults["base_url"]
+    if args.ai_provider and not args.ai_model:
+        ai_model = provider_defaults["model"]
     default_bbox = args.default_bbox or defaults.get("bbox", DEFAULT_BBOX)
     registry_path = args.registry or defaults.get("registry", DEFAULT_REGISTRY)
     workspace = args.workspace or defaults.get("workspace", str(Path.cwd().resolve()))
@@ -62,10 +92,23 @@ def cmd_onboard(args: argparse.Namespace) -> int:
     except FileNotFoundError:
         detected_qgis = ""
 
-    existing_key = os.environ.get("GEOCLAW_OPENAI_API_KEY", "").strip()
+    existing_key = (
+        os.environ.get("GEOCLAW_AI_API_KEY", "").strip()
+        or os.environ.get("GEOCLAW_OPENAI_API_KEY", "").strip()
+        or os.environ.get("GEOCLAW_QWEN_API_KEY", "").strip()
+        or os.environ.get("GEOCLAW_GEMINI_API_KEY", "").strip()
+    )
 
     if not args.non_interactive:
         print(f"GeoClaw-OpenAI home: {geoclaw_home()}")
+        ai_provider = ask_value("AI Provider (openai/qwen/gemini)", ai_provider).strip().lower() or ai_provider
+        if ai_provider not in AI_PROVIDER_PRESETS:
+            raise ValueError(f"unsupported AI provider: {ai_provider}")
+        provider_defaults = AI_PROVIDER_PRESETS[ai_provider]
+        if not args.ai_base_url and api_base_url == defaults.get("ai_base_url", ""):
+            api_base_url = provider_defaults["base_url"]
+        if not args.ai_model and ai_model == defaults.get("ai_model", ""):
+            ai_model = provider_defaults["model"]
         api_base_url = ask_value("AI Base URL", api_base_url)
         ai_model = ask_value("AI Model", ai_model)
         default_bbox = ask_value("Default BBOX (south,west,north,east)", default_bbox)
@@ -81,7 +124,7 @@ def cmd_onboard(args: argparse.Namespace) -> int:
                 print("[WARN] qgis_process 路径无效，将仅写入原值")
                 detected_qgis = qgis_input
 
-        api_key = args.api_key or ask_secret("OpenAI API Key", default_masked=bool(existing_key))
+        api_key = args.api_key or ask_secret(f"{ai_provider.upper()} API Key", default_masked=bool(existing_key))
         if not api_key and existing_key:
             api_key = existing_key
     else:
@@ -90,13 +133,14 @@ def cmd_onboard(args: argparse.Namespace) -> int:
             detected_qgis = args.qgis_process or runtime.get("qgis_process", "")
 
     if not api_key:
-        raise ValueError("OpenAI API key is required. Use --api-key or run interactive onboard.")
+        raise ValueError("AI API key is required. Use --api-key or run interactive onboard.")
 
     now = dt.datetime.now(dt.timezone.utc).isoformat()
     payload = {
-        "version": "2.1",
+        "version": PROJECT_VERSION,
         "updated_at": now,
         "defaults": {
+            "ai_provider": ai_provider,
             "ai_base_url": api_base_url,
             "ai_model": ai_model,
             "bbox": default_bbox,
@@ -113,6 +157,10 @@ def cmd_onboard(args: argparse.Namespace) -> int:
         payload["created_at"] = now
 
     env_values = {
+        "GEOCLAW_AI_PROVIDER": ai_provider,
+        "GEOCLAW_AI_BASE_URL": api_base_url,
+        "GEOCLAW_AI_API_KEY": api_key,
+        "GEOCLAW_AI_MODEL": ai_model,
         "GEOCLAW_OPENAI_BASE_URL": api_base_url,
         "GEOCLAW_OPENAI_API_KEY": api_key,
         "GEOCLAW_OPENAI_MODEL": ai_model,
@@ -120,6 +168,14 @@ def cmd_onboard(args: argparse.Namespace) -> int:
         "GEOCLAW_OPENAI_SKILL_REGISTRY": registry_path,
         "GEOCLAW_OPENAI_WORKSPACE": workspace,
     }
+    if ai_provider == "qwen":
+        env_values["GEOCLAW_QWEN_BASE_URL"] = api_base_url
+        env_values["GEOCLAW_QWEN_API_KEY"] = api_key
+        env_values["GEOCLAW_QWEN_MODEL"] = ai_model
+    if ai_provider == "gemini":
+        env_values["GEOCLAW_GEMINI_BASE_URL"] = api_base_url
+        env_values["GEOCLAW_GEMINI_API_KEY"] = api_key
+        env_values["GEOCLAW_GEMINI_MODEL"] = ai_model
     if detected_qgis:
         env_values["GEOCLAW_OPENAI_QGIS_PROCESS"] = detected_qgis
 
@@ -146,6 +202,120 @@ def cmd_config_show(_args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
     cfg = read_config()
     print(json.dumps(cfg, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_config_set(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    existing = read_config()
+    defaults = existing.get("defaults") if isinstance(existing.get("defaults"), dict) else {}
+    runtime = existing.get("runtime") if isinstance(existing.get("runtime"), dict) else {}
+
+    current_provider = str(defaults.get("ai_provider", DEFAULT_AI_PROVIDER)).strip().lower() or DEFAULT_AI_PROVIDER
+    ai_provider = str(args.ai_provider or current_provider).strip().lower()
+    if ai_provider not in AI_PROVIDER_PRESETS:
+        raise ValueError(f"unsupported --ai-provider: {ai_provider}. choices={sorted(AI_PROVIDER_PRESETS.keys())}")
+    provider_changed = bool(args.ai_provider) and ai_provider != current_provider
+    preset = AI_PROVIDER_PRESETS[ai_provider]
+
+    ai_base_url = str(args.ai_base_url or "").strip()
+    if not ai_base_url:
+        if provider_changed:
+            ai_base_url = preset["base_url"]
+        else:
+            ai_base_url = str(defaults.get("ai_base_url", "")).strip() or preset["base_url"]
+
+    ai_model = str(args.ai_model or "").strip()
+    if not ai_model:
+        if provider_changed:
+            ai_model = preset["model"]
+        else:
+            ai_model = str(defaults.get("ai_model", "")).strip() or preset["model"]
+
+    default_bbox = str(args.default_bbox or defaults.get("bbox", DEFAULT_BBOX)).strip() or DEFAULT_BBOX
+    registry_path = str(args.registry or defaults.get("registry", DEFAULT_REGISTRY)).strip() or DEFAULT_REGISTRY
+    workspace = str(args.workspace or defaults.get("workspace", str(Path.cwd().resolve()))).strip()
+
+    qgis_process = str(args.qgis_process or runtime.get("qgis_process", "")).strip()
+    if qgis_process:
+        try:
+            qgis_process = detect_qgis_process(qgis_process)
+        except FileNotFoundError:
+            pass
+
+    now = dt.datetime.now(dt.timezone.utc).isoformat()
+    payload = {
+        "version": PROJECT_VERSION,
+        "updated_at": now,
+        "defaults": {
+            "ai_provider": ai_provider,
+            "ai_base_url": ai_base_url,
+            "ai_model": ai_model,
+            "bbox": default_bbox,
+            "registry": registry_path,
+            "workspace": workspace,
+        },
+        "runtime": {
+            "qgis_process": qgis_process,
+        },
+        "created_at": existing.get("created_at", now),
+    }
+
+    env_values = parse_env_file(env_path())
+    existing_api_key = (
+        env_values.get("GEOCLAW_AI_API_KEY", "").strip()
+        or env_values.get("GEOCLAW_OPENAI_API_KEY", "").strip()
+        or env_values.get("GEOCLAW_QWEN_API_KEY", "").strip()
+        or env_values.get("GEOCLAW_GEMINI_API_KEY", "").strip()
+    )
+    api_key = str(args.api_key or existing_api_key).strip()
+
+    env_values.update(
+        {
+            "GEOCLAW_AI_PROVIDER": ai_provider,
+            "GEOCLAW_AI_BASE_URL": ai_base_url,
+            "GEOCLAW_AI_MODEL": ai_model,
+            "GEOCLAW_OPENAI_BASE_URL": ai_base_url,
+            "GEOCLAW_OPENAI_MODEL": ai_model,
+            "GEOCLAW_OPENAI_DEFAULT_BBOX": default_bbox,
+            "GEOCLAW_OPENAI_SKILL_REGISTRY": registry_path,
+            "GEOCLAW_OPENAI_WORKSPACE": workspace,
+        }
+    )
+    if api_key:
+        env_values["GEOCLAW_AI_API_KEY"] = api_key
+        env_values["GEOCLAW_OPENAI_API_KEY"] = api_key
+    if qgis_process:
+        env_values["GEOCLAW_OPENAI_QGIS_PROCESS"] = qgis_process
+
+    if ai_provider == "qwen":
+        env_values["GEOCLAW_QWEN_BASE_URL"] = ai_base_url
+        env_values["GEOCLAW_QWEN_MODEL"] = ai_model
+        if api_key:
+            env_values["GEOCLAW_QWEN_API_KEY"] = api_key
+    if ai_provider == "gemini":
+        env_values["GEOCLAW_GEMINI_BASE_URL"] = ai_base_url
+        env_values["GEOCLAW_GEMINI_MODEL"] = ai_model
+        if api_key:
+            env_values["GEOCLAW_GEMINI_API_KEY"] = api_key
+
+    config_file = write_config(payload)
+    env_file = write_env(env_values)
+    env_sh = write_env_sh(env_values)
+    print(
+        json.dumps(
+            {
+                "config": str(config_file),
+                "env": str(env_file),
+                "env_sh": str(env_sh),
+                "ai_provider": ai_provider,
+                "ai_model": ai_model,
+                "ai_base_url": ai_base_url,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0
 
 
@@ -302,6 +472,7 @@ def cmd_memory_status(args: argparse.Namespace) -> int:
         "short_count": store.count_short(),
         "long_count": store.count_long(),
         "short_dir": str(store.short_dir),
+        "archive_short_dir": str(store.archive_short_dir),
         "long_file": str(store.long_file),
         "limit": args.limit,
     }
@@ -335,6 +506,33 @@ def cmd_memory_review(args: argparse.Namespace) -> int:
         next_actions=args.action or [],
     )
     print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_memory_archive(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    store = TaskMemoryStore()
+    payload = store.archive_short(
+        before_days=args.before_days,
+        status=args.status,
+        include_running=bool(args.include_running),
+    )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_memory_search(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    if not args.query.strip():
+        raise ValueError("--query is required")
+    store = TaskMemoryStore()
+    rows = store.search_memory(
+        query=args.query,
+        scope=args.scope,
+        top_k=args.top_k,
+        min_score=args.min_score,
+    )
+    print(json.dumps({"items": rows, "count": len(rows)}, ensure_ascii=False, indent=2))
     return 0
 
 
@@ -454,6 +652,19 @@ def cmd_network(args: argparse.Namespace) -> int:
             raise ValueError("--columns-map must decode to a JSON object")
         columns_map = {str(k): str(v) for k, v in parsed.items()}
 
+    workspace_root = resolve_workspace_root()
+    try:
+        validate_output_targets(
+            {
+                "INPUT": str(Path(args.pfs_csv).expanduser().resolve()),
+                "OUTPUT": args.out_dir,
+            },
+            workspace_root=workspace_root,
+            safe_output_root=fixed_output_root(workspace_root),
+        )
+    except OutputSecurityError as exc:
+        raise RuntimeError(f"network output security check failed: {exc}") from exc
+
     try:
         payload = svc.run_from_positionfixes_csv(
             pfs_csv=args.pfs_csv,
@@ -496,7 +707,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     onboard = sub.add_parser("onboard", help="setup GeoClaw runtime and API parameters")
-    onboard.add_argument("--api-key", default="", help="OpenAI API key")
+    onboard.add_argument("--api-key", default="", help="AI API key (OpenAI/Qwen/Gemini)")
+    onboard.add_argument("--ai-provider", default="", help="AI provider: openai or qwen or gemini")
     onboard.add_argument("--ai-base-url", default="", help="AI base URL")
     onboard.add_argument("--ai-model", default="", help="AI model name")
     onboard.add_argument("--qgis-process", default="", help="qgis_process path")
@@ -510,6 +722,16 @@ def build_parser() -> argparse.ArgumentParser:
     cfg_sub = cfg.add_subparsers(dest="config_cmd", required=True)
     cfg_show = cfg_sub.add_parser("show", help="print current config")
     cfg_show.set_defaults(func=cmd_config_show)
+    cfg_set = cfg_sub.add_parser("set", help="update AI/model/runtime settings")
+    cfg_set.add_argument("--api-key", default="", help="AI API key (optional)")
+    cfg_set.add_argument("--ai-provider", default="", help="openai | qwen | gemini")
+    cfg_set.add_argument("--ai-base-url", default="", help="AI base URL")
+    cfg_set.add_argument("--ai-model", default="", help="AI model name")
+    cfg_set.add_argument("--qgis-process", default="", help="qgis_process path")
+    cfg_set.add_argument("--default-bbox", default="", help="default bbox")
+    cfg_set.add_argument("--registry", default="", help="skills registry path")
+    cfg_set.add_argument("--workspace", default="", help="default workspace path")
+    cfg_set.set_defaults(func=cmd_config_set)
 
     envp = sub.add_parser("env", help="print shell source command")
     envp.set_defaults(func=cmd_env)
@@ -539,7 +761,11 @@ def build_parser() -> argparse.ArgumentParser:
     run_src.add_argument("--data-dir", default="", help="local data folder with required GeoJSON files")
     run.add_argument("--tag", default="", help="output tag")
     run.add_argument("--raw-dir", default="", help="raw data folder for download/cache")
-    run.add_argument("--out-root", default="data/outputs", help="analysis outputs root")
+    run.add_argument(
+        "--out-root",
+        default="",
+        help="analysis outputs root (fixed to data/outputs by security policy)",
+    )
     run.add_argument("--top-n", type=int, default=12, help="top candidates in site selection")
     run.add_argument("--timeout", type=int, default=120, help="download timeout")
     run.add_argument("--skip-download", action="store_true")
@@ -561,7 +787,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     network = sub.add_parser("network", help="complex mobility network analysis via trackintel")
     network.add_argument("--pfs-csv", required=True, help="positionfix csv path")
-    network.add_argument("--out-dir", default="data/outputs/network_trackintel", help="output directory")
+    network.add_argument(
+        "--out-dir",
+        default="data/outputs/network_trackintel",
+        help="output directory (must be under data/outputs)",
+    )
     network.add_argument("--sep", default=",", help="csv separator")
     network.add_argument("--index-col", default="", help="optional index column name")
     network.add_argument("--tz", default="UTC", help="timezone for tracked_at parsing")
@@ -613,6 +843,19 @@ def build_parser() -> argparse.ArgumentParser:
     mem_review.add_argument("--lesson", action="append", default=[], help="repeatable lesson item")
     mem_review.add_argument("--action", action="append", default=[], help="repeatable next action item")
     mem_review.set_defaults(func=cmd_memory_review)
+
+    mem_archive = memory_sub.add_parser("archive", help="archive short-term memory entries")
+    mem_archive.add_argument("--before-days", type=int, default=7, help="archive tasks older than N days")
+    mem_archive.add_argument("--status", default="", choices=["", "running", "success", "failed"], help="optional status filter")
+    mem_archive.add_argument("--include-running", action="store_true", help="allow archiving running tasks")
+    mem_archive.set_defaults(func=cmd_memory_archive)
+
+    mem_search = memory_sub.add_parser("search", help="vector retrieval over task memories")
+    mem_search.add_argument("--query", required=True, help="query text")
+    mem_search.add_argument("--scope", default="long", choices=["short", "long", "archive", "all"], help="memory scope")
+    mem_search.add_argument("--top-k", type=int, default=5, help="top-k results")
+    mem_search.add_argument("--min-score", type=float, default=0.15, help="minimum similarity score")
+    mem_search.set_defaults(func=cmd_memory_search)
 
     nl = sub.add_parser("nl", help="run geoclaw-openai from natural language")
     nl.add_argument("query", nargs="+", help="natural language request text")

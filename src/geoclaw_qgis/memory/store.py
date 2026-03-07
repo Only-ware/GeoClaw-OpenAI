@@ -2,11 +2,13 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import shutil
 import uuid
 from pathlib import Path
 from typing import Any
 
 from geoclaw_qgis.config import geoclaw_home
+from .retrieval import best_matches
 
 
 def _utc_now() -> str:
@@ -19,6 +21,7 @@ class TaskMemoryStore:
     def __init__(self) -> None:
         self._root = geoclaw_home() / "memory"
         self._short_dir = self._root / "short"
+        self._archive_short_dir = self._root / "archive" / "short"
         self._long_file = self._root / "long_term.jsonl"
         self._ensure_paths()
 
@@ -27,11 +30,16 @@ class TaskMemoryStore:
         return self._short_dir
 
     @property
+    def archive_short_dir(self) -> Path:
+        return self._archive_short_dir
+
+    @property
     def long_file(self) -> Path:
         return self._long_file
 
     def _ensure_paths(self) -> None:
         self._short_dir.mkdir(parents=True, exist_ok=True)
+        self._archive_short_dir.mkdir(parents=True, exist_ok=True)
         self._long_file.parent.mkdir(parents=True, exist_ok=True)
         if not self._long_file.exists():
             self._long_file.touch()
@@ -183,6 +191,109 @@ class TaskMemoryStore:
                 break
         return rows
 
+    def list_archive_short(self, *, limit: int = 20, status: str = "") -> list[dict[str, Any]]:
+        rows: list[dict[str, Any]] = []
+        for path in sorted(self._archive_short_dir.glob("*.json"), reverse=True):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                continue
+            if not isinstance(payload, dict):
+                continue
+            row_status = str(payload.get("status", ""))
+            if status and row_status != status:
+                continue
+            rows.append(payload)
+            if len(rows) >= max(1, limit):
+                break
+        return rows
+
+    def archive_short(
+        self,
+        *,
+        before_days: int = 7,
+        status: str = "",
+        include_running: bool = False,
+    ) -> dict[str, Any]:
+        cutoff = dt.datetime.now(dt.timezone.utc) - dt.timedelta(days=max(0, int(before_days)))
+        moved = 0
+        skipped = 0
+        archived_ids: list[str] = []
+
+        for path in sorted(self._short_dir.glob("*.json")):
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except json.JSONDecodeError:
+                skipped += 1
+                continue
+            if not isinstance(payload, dict):
+                skipped += 1
+                continue
+
+            row_status = str(payload.get("status", ""))
+            if status and row_status != status:
+                skipped += 1
+                continue
+            if not include_running and row_status == "running":
+                skipped += 1
+                continue
+
+            ts = str(payload.get("finished_at", "") or payload.get("updated_at", "") or payload.get("created_at", ""))
+            try:
+                item_time = dt.datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            except Exception:
+                skipped += 1
+                continue
+            if item_time > cutoff:
+                skipped += 1
+                continue
+
+            dst = self._archive_short_dir / path.name
+            if dst.exists():
+                dst = self._archive_short_dir / f"{path.stem}-{uuid.uuid4().hex[:6]}.json"
+            shutil.move(str(path), str(dst))
+            moved += 1
+            archived_ids.append(str(payload.get("task_id", path.stem)))
+
+        return {
+            "moved": moved,
+            "skipped": skipped,
+            "before_days": int(before_days),
+            "status_filter": status,
+            "archive_dir": str(self._archive_short_dir),
+            "archived_task_ids": archived_ids,
+        }
+
+    def search_memory(
+        self,
+        *,
+        query: str,
+        scope: str = "long",
+        top_k: int = 5,
+        min_score: float = 0.15,
+    ) -> list[dict[str, Any]]:
+        scope_text = scope.strip().lower() or "long"
+        if scope_text not in {"short", "long", "all", "archive"}:
+            raise ValueError("scope must be one of: short, long, archive, all")
+
+        items: list[dict[str, object]] = []
+        if scope_text in {"short", "all"}:
+            for row in self.list_short(limit=500):
+                text = self._build_search_text(row, source="short")
+                items.append({"source": "short", "task_id": row.get("task_id", ""), "search_text": text, "payload": row})
+
+        if scope_text in {"archive", "all"}:
+            for row in self.list_archive_short(limit=1000):
+                text = self._build_search_text(row, source="archive")
+                items.append({"source": "archive", "task_id": row.get("task_id", ""), "search_text": text, "payload": row})
+
+        if scope_text in {"long", "all"}:
+            for row in self.list_long(limit=1000):
+                text = self._build_search_text(row, source="long")
+                items.append({"source": "long", "task_id": row.get("task_id", ""), "search_text": text, "payload": row})
+
+        return best_matches(query, items, top_k=top_k, min_score=min_score)
+
     def count_short(self) -> int:
         return len(list(self._short_dir.glob("*.json")))
 
@@ -230,3 +341,22 @@ class TaskMemoryStore:
             "lessons": lessons,
             "next_actions": actions,
         }
+
+    def _build_search_text(self, payload: dict[str, Any], *, source: str) -> str:
+        parts: list[str] = [
+            str(source),
+            str(payload.get("task_id", "")),
+            str(payload.get("command", "")),
+            " ".join(str(x) for x in (payload.get("argv") or [])),
+            str(payload.get("status", "")),
+            str(payload.get("error", "")),
+            str(payload.get("summary", "")),
+        ]
+        review = payload.get("review")
+        if isinstance(review, dict):
+            parts.append(str(review.get("summary", "")))
+            parts.extend(str(x) for x in (review.get("lessons") or []))
+            parts.extend(str(x) for x in (review.get("next_actions") or []))
+        parts.extend(str(x) for x in (payload.get("lessons") or []))
+        parts.extend(str(x) for x in (payload.get("next_actions") or []))
+        return "\n".join(x for x in parts if x.strip())

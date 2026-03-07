@@ -5,7 +5,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -19,6 +18,7 @@ if str(SRC) not in sys.path:
 from geoclaw_qgis.config import bootstrap_runtime_env, detect_qgis_process
 from geoclaw_qgis.project_info import LAB_AFFILIATION, PROJECT_ATTRIBUTION, PROJECT_VERSION
 from geoclaw_qgis.providers import QgisProcessRunner
+from geoclaw_qgis.security import OutputSecurityError, validate_output_targets
 
 try:
     import yaml  # type: ignore
@@ -102,65 +102,12 @@ def load_params_file(path_text: str) -> dict[str, Any]:
     return parsed
 
 
-def _is_special_output(value: str) -> bool:
-    text = value.strip()
-    lowered = text.lower()
-    if not text:
-        return True
-    if text == "TEMPORARY_OUTPUT":
-        return True
-    if lowered.startswith("memory:") or lowered.startswith("/vsimem/"):
-        return True
-    if lowered.startswith("http://") or lowered.startswith("https://"):
-        return True
-    if lowered.startswith("dbname=") or lowered.startswith("postgres://"):
-        return True
-    return False
-
-
-def _looks_like_path(value: str) -> bool:
-    lowered = value.lower()
-    if "/" in value or "\\" in value:
-        return True
-    return lowered.endswith(
-        (
-            ".gpkg",
-            ".geojson",
-            ".json",
-            ".sqlite",
-            ".db",
-            ".shp",
-            ".tif",
-            ".tiff",
-            ".vrt",
-            ".csv",
-            ".png",
-            ".jpg",
-            ".jpeg",
-            ".svg",
-            ".qgz",
-        )
-    )
-
-
 def prepare_output_targets(params: dict[str, Any], overwrite: bool) -> None:
-    for key, raw_value in params.items():
-        if "OUTPUT" not in key.upper():
-            continue
-        if not isinstance(raw_value, str):
-            continue
-        value = raw_value.strip()
-        if _is_special_output(value) or not _looks_like_path(value):
-            continue
-        path = Path(value)
-        if not path.is_absolute():
-            path = (ROOT / path).resolve()
+    output_paths = validate_output_targets(params, workspace_root=ROOT)
+    for path in output_paths.values():
         path.parent.mkdir(parents=True, exist_ok=True)
-        if overwrite and path.exists():
-            if path.is_dir():
-                shutil.rmtree(path)
-            else:
-                path.unlink()
+        if overwrite and path.exists() and path.is_file():
+            path.unlink()
 
 
 def main() -> int:
@@ -181,7 +128,10 @@ def main() -> int:
         raise FileNotFoundError("qgis_process not found; set --qgis-process or GEOCLAW_OPENAI_QGIS_PROCESS")
 
     runner = QgisProcessRunner(command=qgis_process)
-    prepare_output_targets(params, overwrite=not args.no_overwrite)
+    try:
+        prepare_output_targets(params, overwrite=not args.no_overwrite)
+    except OutputSecurityError as exc:
+        raise RuntimeError(f"output security check failed: {exc}") from exc
     encoded = [f"{k}={runner.encode_value(v)}" for k, v in params.items()]
     dry_cmd = [qgis_process, "--json", "run", args.algorithm, "--"] + encoded
     if args.dry_run:

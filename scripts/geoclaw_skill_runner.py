@@ -16,7 +16,7 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from geoclaw_qgis.ai import ExternalAIClient, ExternalAIConfig
+from geoclaw_qgis.ai import ExternalAIClient, ExternalAIConfig, compress_context
 from geoclaw_qgis.config import bootstrap_runtime_env
 from geoclaw_qgis.skills import SkillRegistry
 
@@ -113,11 +113,12 @@ def run_ai_skill(skill_id: str, registry: SkillRegistry, ai_text: str, require_a
 def summarize_with_ai(skill_id: str, registry: SkillRegistry, extra_prompt: str, require_ai: bool) -> dict[str, Any]:
     spec = registry.get(skill_id)
     report_text = read_text(str(ROOT / spec.report_path)) if spec.report_path else ""
+    compressed_report = compress_context(report_text, max_chars=12000)
     prompt = (
         "请基于以下 GeoClaw pipeline 报告，输出空间分析结论、风险、建议行动。\n"
         "输出结构：1) 结论 2) 风险 3) 选址建议 4) 数据质量建议\n\n"
         f"[skill]={skill_id}\n"
-        f"[report]\n{report_text[:12000]}\n\n"
+        f"[report]\n{compressed_report.text}\n\n"
         f"[extra]\n{extra_prompt}"
     )
 
