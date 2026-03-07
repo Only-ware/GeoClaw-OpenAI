@@ -1,0 +1,74 @@
+name: raster_basics_demo
+version: 1.0
+
+description: >-
+  Beginner-friendly raster analysis demo. Create hospital density raster and
+  summarize zonal statistics on regular grids.
+
+variables:
+  raw_dir: data/raw/wuhan_osm
+  out_dir: data/outputs/demo_raster
+  target_crs: EPSG:32650
+  grid_spacing_m: 2000
+  heat_radius_m: 2500
+  heat_pixel_m: 150
+
+steps:
+  - id: study_area_proj
+    algorithm: native:reprojectlayer
+    params:
+      INPUT: ${raw_dir}/study_area.geojson
+      TARGET_CRS: ${target_crs}
+      OUTPUT: ${out_dir}/study_area_32650.gpkg
+
+  - id: hospitals_proj
+    algorithm: native:reprojectlayer
+    params:
+      INPUT: ${raw_dir}/hospitals.geojson
+      TARGET_CRS: ${target_crs}
+      OUTPUT: ${out_dir}/hospitals_32650.gpkg
+
+  - id: analysis_grid
+    algorithm: native:creategrid
+    params:
+      TYPE: 2
+      EXTENT: ${study_area_proj.OUTPUT}
+      HSPACING: ${grid_spacing_m}
+      VSPACING: ${grid_spacing_m}
+      HOVERLAY: 0
+      VOVERLAY: 0
+      CRS: ${target_crs}
+      OUTPUT: ${out_dir}/grid_2km.gpkg
+
+  - id: hospitals_heatmap
+    algorithm: qgis:heatmapkerneldensityestimation
+    params:
+      INPUT: ${hospitals_proj.OUTPUT}
+      RADIUS: ${heat_radius_m}
+      PIXEL_SIZE: ${heat_pixel_m}
+      KERNEL: 0
+      OUTPUT_VALUE: 0
+      OUTPUT: ${out_dir}/hospitals_heatmap.tif
+
+  - id: grid_zonal_stats
+    algorithm: native:zonalstatisticsfb
+    params:
+      INPUT: ${analysis_grid.OUTPUT}
+      INPUT_RASTER: ${hospitals_heatmap.OUTPUT}
+      RASTER_BAND: 1
+      COLUMN_PREFIX: HM_
+      STATISTICS: 2
+      OUTPUT: ${out_dir}/grid_heat_stats.gpkg
+
+  - id: heat_norm
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${grid_zonal_stats.OUTPUT}
+      FIELD_NAME: HEAT_NORM
+      FIELD_TYPE: 0
+      FIELD_LENGTH: 16
+      FIELD_PRECISION: 6
+      FORMULA: "coalesce((\"HM_mean\" - aggregate(@layer,'min',\"HM_mean\")) / nullif(aggregate(@layer,'max',\"HM_mean\") - aggregate(@layer,'min',\"HM_mean\"), 0), 0)"
+      OUTPUT: ${out_dir}/grid_heat_norm.gpkg
+
+  # TODO: Add a raster classification step (quantile/Jenks) for automatic map classes.

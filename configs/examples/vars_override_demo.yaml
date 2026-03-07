@@ -1,0 +1,6 @@
+raw_dir: data/raw/wuhan_osm
+out_dir: data/outputs/demo_vector_from_vars_file
+buffer_m: 1500
+min_service_len_m: 700
+
+# TODO: Add additional override examples for city-scale experiments.

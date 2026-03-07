@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "skills": [
+    {
+      "id": "location_analysis",
+      "type": "pipeline",
+      "description": "Run native location analysis case for urban location scoring.",
+      "pipeline": "pipelines/cases/location_analysis.yaml",
+      "requires_osm": true,
+      "default_bbox": "30.50,114.20,30.66,114.45",
+      "report_path": "data/outputs/wuhan_location/pipeline_report.json"
+    },
+    {
+      "id": "site_selection",
+      "type": "pipeline",
+      "description": "Run native site selection case for ranked candidate sites.",
+      "pipeline": "pipelines/cases/site_selection.yaml",
+      "requires_osm": true,
+      "default_bbox": "30.50,114.20,30.66,114.45",
+      "pre_steps": [
+        "location_analysis"
+      ],
+      "report_path": "data/outputs/wuhan_site/pipeline_report.json"
+    },
+    {
+      "id": "ai_planning_assistant",
+      "type": "ai",
+      "description": "Use external AI API to summarize planning insights from GeoClaw outputs.",
+      "system_prompt": "You are a GIS planning analyst. Summarize spatial priorities, risks, and action steps based on provided GeoClaw outputs."
+    }
+  ]
+}

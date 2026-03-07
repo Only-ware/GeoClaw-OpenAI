@@ -1,0 +1,27 @@
+name: wuhan_thematic_maps
+
+# TODO: Support dynamic classifiers (quantile/Jenks) to avoid hardcoded breakpoints per city.
+themes:
+  - name: geoclaw_index
+    title: Wuhan GeoClaw Composite Index
+    field: GEOCLAW_IDX
+    breaks: [20, 40, 60, 80]
+    colors: ["#f7fcf5", "#c7e9c0", "#74c476", "#31a354", "#006d2c"]
+
+  - name: road_intensity
+    title: Wuhan Road Intensity (m per grid)
+    field: RD_LEN_M
+    breaks: [15000, 35000, 55000, 80000]
+    colors: ["#fff5eb", "#fd8d3c", "#f16913", "#d94801", "#8c2d04"]
+
+  - name: accessibility
+    title: Wuhan Hospital Accessibility (normalized)
+    field: ACCESS_NORM
+    breaks: [0.2, 0.4, 0.6, 0.8]
+    colors: ["#f7fbff", "#c6dbef", "#6baed6", "#2171b5", "#08306b"]
+
+  - name: hotspot
+    title: Wuhan Medical Hotspot Intensity (normalized)
+    field: HEAT_NORM
+    breaks: [0.2, 0.4, 0.6, 0.8]
+    colors: ["#ffffcc", "#ffeda0", "#feb24c", "#f03b20", "#bd0026"]

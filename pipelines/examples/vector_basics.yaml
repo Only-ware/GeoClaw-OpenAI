@@ -1,0 +1,76 @@
+name: vector_basics_demo
+version: 1.0
+
+description: >-
+  Beginner-friendly vector analysis demo. Reproject, buffer, clip, calculate
+  geometry fields, and dissolve service corridors.
+
+variables:
+  raw_dir: data/raw/wuhan_osm
+  out_dir: data/outputs/demo_vector
+  target_crs: EPSG:32650
+  buffer_m: 1200
+  min_service_len_m: 600
+
+steps:
+  - id: roads_proj
+    algorithm: native:reprojectlayer
+    params:
+      INPUT: ${raw_dir}/roads.geojson
+      TARGET_CRS: ${target_crs}
+      OUTPUT: ${out_dir}/roads_32650.gpkg
+
+  - id: hospitals_proj
+    algorithm: native:reprojectlayer
+    params:
+      INPUT: ${raw_dir}/hospitals.geojson
+      TARGET_CRS: ${target_crs}
+      OUTPUT: ${out_dir}/hospitals_32650.gpkg
+
+  - id: hospitals_buffer
+    algorithm: native:buffer
+    params:
+      INPUT: ${hospitals_proj.OUTPUT}
+      DISTANCE: ${buffer_m}
+      SEGMENTS: 12
+      END_CAP_STYLE: 0
+      JOIN_STYLE: 0
+      MITER_LIMIT: 2
+      DISSOLVE: 1
+      SEPARATE_DISJOINT: 0
+      OUTPUT: ${out_dir}/hospitals_service_zone.gpkg
+
+  - id: roads_service_clip
+    algorithm: native:clip
+    params:
+      INPUT: ${roads_proj.OUTPUT}
+      OVERLAY: ${hospitals_buffer.OUTPUT}
+      OUTPUT: ${out_dir}/roads_in_service_zone.gpkg
+
+  - id: service_len
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${roads_service_clip.OUTPUT}
+      FIELD_NAME: LEN_M
+      FIELD_TYPE: 0
+      FIELD_LENGTH: 16
+      FIELD_PRECISION: 2
+      FORMULA: "round($length, 2)"
+      OUTPUT: ${out_dir}/roads_service_len.gpkg
+
+  - id: service_roads_filtered
+    algorithm: native:extractbyexpression
+    params:
+      INPUT: ${service_len.OUTPUT}
+      EXPRESSION: "\"LEN_M\" >= ${min_service_len_m}"
+      OUTPUT: ${out_dir}/roads_service_filtered.gpkg
+
+  - id: service_corridor
+    algorithm: native:dissolve
+    params:
+      INPUT: ${service_roads_filtered.OUTPUT}
+      FIELD: []
+      SEPARATE_DISJOINT: 0
+      OUTPUT: ${out_dir}/roads_service_corridor.gpkg
+
+  # TODO: Add optional topology checks for disconnected fragments in service corridors.

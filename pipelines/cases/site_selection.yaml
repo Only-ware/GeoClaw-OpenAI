@@ -1,0 +1,73 @@
+name: geoclaw_site_selection
+version: 1.0
+
+description: >-
+  Native site selection case for GeoClaw. Selects and ranks candidate points
+  from location-analysis output.
+
+variables:
+  location_input: data/outputs/wuhan_location/grid_location.gpkg
+  out_dir: data/outputs/wuhan_site
+  top_n: 12
+
+steps:
+  - id: feasible_cells
+    algorithm: native:extractbyexpression
+    params:
+      INPUT: ${location_input}
+      EXPRESSION: "\"SAFETY_NORM\" >= 0.45 AND \"UNDERSERVED_NORM\" >= 0.40 AND \"SERVICE_NORM\" <= 0.85"
+      OUTPUT: ${out_dir}/site_feasible_cells.gpkg
+
+  - id: site_score
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${feasible_cells.OUTPUT}
+      FIELD_NAME: SITE_SCORE
+      FIELD_TYPE: 0
+      FIELD_LENGTH: 16
+      FIELD_PRECISION: 4
+      FORMULA: "round(100 * (0.45 * \"UNDERSERVED_NORM\" + 0.25 * \"HEAT_NORM\" + 0.20 * \"RD_NORM\" + 0.10 * \"SAFETY_NORM\"), 4)"
+      OUTPUT: ${out_dir}/site_scored_cells.gpkg
+
+  - id: site_rank
+    algorithm: native:addautoincrementalfield
+    params:
+      INPUT: ${site_score.OUTPUT}
+      FIELD_NAME: SITE_RANK
+      START: 1
+      SORT_EXPRESSION: "\"SITE_SCORE\""
+      SORT_ASCENDING: 0
+      SORT_NULLS_FIRST: 0
+      OUTPUT: ${out_dir}/site_ranked_cells.gpkg
+
+  - id: site_priority
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${site_rank.OUTPUT}
+      FIELD_NAME: SITE_CLASS
+      FIELD_TYPE: 2
+      FIELD_LENGTH: 12
+      FIELD_PRECISION: 0
+      FORMULA: "case when \"SITE_SCORE\" >= 50 then 'PRIORITY_A' when \"SITE_SCORE\" >= 42 then 'PRIORITY_B' else 'PRIORITY_C' end"
+      OUTPUT: ${out_dir}/site_class_cells.gpkg
+
+  - id: top_cells
+    algorithm: native:extractbyexpression
+    params:
+      INPUT: ${site_priority.OUTPUT}
+      EXPRESSION: "\"SITE_RANK\" <= ${top_n}"
+      OUTPUT: ${out_dir}/top_cells.gpkg
+
+  - id: top_centroids
+    algorithm: native:centroids
+    params:
+      INPUT: ${top_cells.OUTPUT}
+      ALL_PARTS: 0
+      OUTPUT: ${out_dir}/site_candidates_raw.gpkg
+
+  - id: candidates_final
+    algorithm: native:retainfields
+    params:
+      INPUT: ${top_centroids.OUTPUT}
+      FIELDS: SITE_RANK;SITE_SCORE;SITE_CLASS;LOCATION_SCORE;LOCATION_LEVEL;UNDERSERVED_NORM;HEAT_NORM;RD_NORM;SAFETY_NORM;NN_HubDist
+      OUTPUT: ${out_dir}/site_candidates.gpkg

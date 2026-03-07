@@ -1,0 +1,232 @@
+name: wuhan_geoclaw_advanced
+version: 0.3
+
+description: >-
+  Wuhan OSM GeoClaw advanced pipeline with overlay metrics, hotspot density,
+  nearest-hospital accessibility, weighted normalization score, and clustering.
+
+variables:
+  raw_dir: data/raw/wuhan_osm
+  out_dir: data/outputs/wuhan_analysis
+  target_crs: EPSG:32650
+  grid_spacing_m: 2000
+  hospital_buffer_m: 2000
+  water_buffer_m: 500
+  heatmap_radius_m: 3000
+  heatmap_pixel_m: 200
+  cluster_count: 6
+
+steps:
+  - id: study_area_proj
+    algorithm: native:reprojectlayer
+    params:
+      INPUT: ${raw_dir}/study_area.geojson
+      TARGET_CRS: ${target_crs}
+      OUTPUT: ${out_dir}/study_area_32650.gpkg
+
+  - id: roads_proj
+    algorithm: native:reprojectlayer
+    params:
+      INPUT: ${raw_dir}/roads.geojson
+      TARGET_CRS: ${target_crs}
+      OUTPUT: ${out_dir}/roads_32650.gpkg
+
+  - id: water_proj
+    algorithm: native:reprojectlayer
+    params:
+      INPUT: ${raw_dir}/water.geojson
+      TARGET_CRS: ${target_crs}
+      OUTPUT: ${out_dir}/water_32650.gpkg
+
+  - id: hospitals_proj
+    algorithm: native:reprojectlayer
+    params:
+      INPUT: ${raw_dir}/hospitals.geojson
+      TARGET_CRS: ${target_crs}
+      OUTPUT: ${out_dir}/hospitals_32650.gpkg
+
+  - id: grid_create
+    algorithm: native:creategrid
+    params:
+      TYPE: 2
+      EXTENT: ${study_area_proj.OUTPUT}
+      HSPACING: ${grid_spacing_m}
+      VSPACING: ${grid_spacing_m}
+      HOVERLAY: 0
+      VOVERLAY: 0
+      CRS: ${target_crs}
+      OUTPUT: ${out_dir}/grid_2km.gpkg
+
+  - id: roads_sum
+    algorithm: native:sumlinelengths
+    params:
+      POLYGONS: ${grid_create.OUTPUT}
+      LINES: ${roads_proj.OUTPUT}
+      LEN_FIELD: RD_LEN_M
+      COUNT_FIELD: RD_CNT
+      OUTPUT: ${out_dir}/grid_roads.gpkg
+
+  - id: hospitals_buffer
+    algorithm: native:buffer
+    params:
+      INPUT: ${hospitals_proj.OUTPUT}
+      DISTANCE: ${hospital_buffer_m}
+      SEGMENTS: 12
+      END_CAP_STYLE: 0
+      JOIN_STYLE: 0
+      MITER_LIMIT: 2
+      DISSOLVE: 1
+      SEPARATE_DISJOINT: 0
+      OUTPUT: ${out_dir}/hosp2km.gpkg
+
+  - id: hosp_overlap
+    algorithm: native:calculatevectoroverlaps
+    params:
+      INPUT: ${roads_sum.OUTPUT}
+      LAYERS: ${hospitals_buffer.OUTPUT}
+      OUTPUT: ${out_dir}/grid_hosp.gpkg
+
+  - id: water_buffer
+    algorithm: native:buffer
+    params:
+      INPUT: ${water_proj.OUTPUT}
+      DISTANCE: ${water_buffer_m}
+      SEGMENTS: 8
+      END_CAP_STYLE: 0
+      JOIN_STYLE: 0
+      MITER_LIMIT: 2
+      DISSOLVE: 1
+      SEPARATE_DISJOINT: 0
+      OUTPUT: ${out_dir}/water500m.gpkg
+
+  - id: water_overlap
+    algorithm: native:calculatevectoroverlaps
+    params:
+      INPUT: ${hosp_overlap.OUTPUT}
+      LAYERS: ${water_buffer.OUTPUT}
+      OUTPUT: ${out_dir}/grid_overlap.gpkg
+
+  - id: hosp_heatmap
+    algorithm: qgis:heatmapkerneldensityestimation
+    params:
+      INPUT: ${hospitals_proj.OUTPUT}
+      RADIUS: ${heatmap_radius_m}
+      PIXEL_SIZE: ${heatmap_pixel_m}
+      KERNEL: 0
+      OUTPUT_VALUE: 0
+      OUTPUT: ${out_dir}/hospitals_heatmap.tif
+
+  - id: grid_heatstats
+    algorithm: native:zonalstatisticsfb
+    params:
+      INPUT: ${water_overlap.OUTPUT}
+      INPUT_RASTER: ${hosp_heatmap.OUTPUT}
+      RASTER_BAND: 1
+      COLUMN_PREFIX: HM_
+      STATISTICS: 2
+      OUTPUT: ${out_dir}/grid_heat.gpkg
+
+  - id: grid_centroids
+    algorithm: native:centroids
+    params:
+      INPUT: ${grid_heatstats.OUTPUT}
+      ALL_PARTS: 0
+      OUTPUT: ${out_dir}/grid_centroids.gpkg
+
+  # TODO: Replace Euclidean nearest-hub distance with network shortest path when a routable road graph is prepared.
+  - id: nearest_hospital
+    algorithm: qgis:distancetonearesthubpoints
+    params:
+      INPUT: ${grid_centroids.OUTPUT}
+      HUBS: ${hospitals_proj.OUTPUT}
+      FIELD: osm_id
+      UNIT: 0
+      OUTPUT: ${out_dir}/grid_hubdist.gpkg
+
+  - id: grid_with_dist
+    algorithm: native:joinattributestable
+    params:
+      INPUT: ${grid_heatstats.OUTPUT}
+      FIELD: id
+      INPUT_2: ${nearest_hospital.OUTPUT}
+      FIELD_2: id
+      FIELDS_TO_COPY: HubDist
+      METHOD: 1
+      DISCARD_NONMATCHING: 0
+      PREFIX: NN_
+      OUTPUT: ${out_dir}/grid_joined.gpkg
+
+  - id: score_rd_norm
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${grid_with_dist.OUTPUT}
+      FIELD_NAME: RD_NORM
+      FIELD_TYPE: 0
+      FIELD_LENGTH: 16
+      FIELD_PRECISION: 6
+      FORMULA: "coalesce((\"RD_LEN_M\" - aggregate(@layer,'min',\"RD_LEN_M\")) / nullif(aggregate(@layer,'max',\"RD_LEN_M\") - aggregate(@layer,'min',\"RD_LEN_M\"), 0), 0)"
+      OUTPUT: ${out_dir}/grid_score_rd.gpkg
+
+  - id: score_hosp_norm
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${score_rd_norm.OUTPUT}
+      FIELD_NAME: HOSP_NORM
+      FIELD_TYPE: 0
+      FIELD_LENGTH: 16
+      FIELD_PRECISION: 6
+      FORMULA: "coalesce((\"hosp2km_pc\" - aggregate(@layer,'min',\"hosp2km_pc\")) / nullif(aggregate(@layer,'max',\"hosp2km_pc\") - aggregate(@layer,'min',\"hosp2km_pc\"), 0), 0)"
+      OUTPUT: ${out_dir}/grid_score_hosp.gpkg
+
+  - id: score_water_norm
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${score_hosp_norm.OUTPUT}
+      FIELD_NAME: WATER_NORM
+      FIELD_TYPE: 0
+      FIELD_LENGTH: 16
+      FIELD_PRECISION: 6
+      FORMULA: "coalesce((\"water500m_pc\" - aggregate(@layer,'min',\"water500m_pc\")) / nullif(aggregate(@layer,'max',\"water500m_pc\") - aggregate(@layer,'min',\"water500m_pc\"), 0), 0)"
+      OUTPUT: ${out_dir}/grid_score_water.gpkg
+
+  - id: score_heat_norm
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${score_water_norm.OUTPUT}
+      FIELD_NAME: HEAT_NORM
+      FIELD_TYPE: 0
+      FIELD_LENGTH: 16
+      FIELD_PRECISION: 6
+      FORMULA: "coalesce((\"HM_mean\" - aggregate(@layer,'min',\"HM_mean\")) / nullif(aggregate(@layer,'max',\"HM_mean\") - aggregate(@layer,'min',\"HM_mean\"), 0), 0)"
+      OUTPUT: ${out_dir}/grid_score_heat.gpkg
+
+  - id: score_access_norm
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${score_heat_norm.OUTPUT}
+      FIELD_NAME: ACCESS_NORM
+      FIELD_TYPE: 0
+      FIELD_LENGTH: 16
+      FIELD_PRECISION: 6
+      FORMULA: "coalesce(1 - ((\"NN_HubDist\" - aggregate(@layer,'min',\"NN_HubDist\")) / nullif(aggregate(@layer,'max',\"NN_HubDist\") - aggregate(@layer,'min',\"NN_HubDist\"), 0)), 1)"
+      OUTPUT: ${out_dir}/grid_score_access.gpkg
+
+  - id: score_geoclaw
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${score_access_norm.OUTPUT}
+      FIELD_NAME: GEOCLAW_IDX
+      FIELD_TYPE: 0
+      FIELD_LENGTH: 16
+      FIELD_PRECISION: 4
+      FORMULA: "round(100 * (0.30 * \"RD_NORM\" + 0.20 * \"HOSP_NORM\" + 0.15 * \"WATER_NORM\" + 0.20 * \"HEAT_NORM\" + 0.15 * \"ACCESS_NORM\"), 4)"
+      OUTPUT: ${out_dir}/grid_final.gpkg
+
+  - id: zone_cluster
+    algorithm: native:kmeansclustering
+    params:
+      INPUT: ${score_geoclaw.OUTPUT}
+      CLUSTERS: ${cluster_count}
+      FIELD_NAME: ZONE_ID
+      SIZE_FIELD_NAME: ZONE_SIZE
+      OUTPUT: ${out_dir}/grid_clustered.gpkg

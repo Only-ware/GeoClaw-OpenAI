@@ -1,0 +1,9 @@
+._*
+__pycache__/
+*.pyc
+
+# local artifacts
+data/
+
+*.egg-info/
+.eggs/
