@@ -223,7 +223,7 @@ geoclaw-openai update --help
 ## 12. 文档导航
 
 - 技术参考：`docs/technical-reference-geoclaw-openai.md`
-- 全量复盘：`docs/geoclaw-full-retrospective-v2.1.0.md`
+- 全量复盘：`docs/geoclaw-full-retrospective-v2.3.0.md`
 - 开发指南：`docs/development-guide.md`
 - 科研学习手册：`docs/scientist-learning-guide.md`
 - 原生案例与 Skill：`docs/native-cases-and-skills.md`

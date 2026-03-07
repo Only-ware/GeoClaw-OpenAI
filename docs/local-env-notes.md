@@ -1,32 +1,46 @@
-# 本地环境说明（当前机器）
+# 本地环境说明（v2.3.0）
 
 检测时间：2026-03-07
 
-## 结论
+## 1. 当前结论
 
-- `qgis_process` 可用，但不在系统 PATH。
-- Homebrew Python (`/opt/homebrew/bin/python3`) 无法直接导入 `qgis` 模块。
-- QGIS 自带 Python (`/Applications/QGIS.app/Contents/MacOS/bin/python3`) 可导入 PyQGIS，且 `processing` 可用。
+- `qgis_process` 可用，但不一定在系统 PATH。
+- 系统 Python 可能无法导入 `qgis`，这是常见现象。
+- QGIS 自带 Python 可用于 PyQGIS 脚本。
 
-## 推荐运行方式（当前阶段）
-
-### 1) 直接走 qgis_process CLI（推荐）
+## 2. 建议的检查命令
 
 ```bash
+# 1) 基础环境
+bash scripts/check_local_env.sh
+
+# 2) qgis_process 检查
 /Applications/QGIS.app/Contents/MacOS/bin/qgis_process --version
-/Applications/QGIS.app/Contents/MacOS/bin/qgis_process list
+
+# 3) CLI 可用性
+geoclaw-openai --help
 ```
 
-### 2) 走 PyQGIS（使用 QGIS 自带 Python）
+## 3. provider 与配置检查
 
 ```bash
-/Applications/QGIS.app/Contents/MacOS/bin/python3 scripts/check_pyqgis.py
+geoclaw-openai config show
 ```
 
-### 3) 可选：给 shell 增加快捷 PATH
+重点确认：
 
-```bash
-export PATH="/Applications/QGIS.app/Contents/MacOS/bin:$PATH"
-```
+- `ai_provider` 是否正确（openai/qwen/gemini）
+- `ai_base_url` 与 provider 是否匹配
+- `ai_model` 是否存在
+- `qgis_process` 路径是否可执行
 
-加入 `~/.zshrc` 后可直接调用 `qgis_process`。
+## 4. 常见排障
+
+1. `geoclaw-openai: command not found`
+- 先执行：`source ~/.geoclaw-openai/env.sh`
+
+2. `qgis_process not found`
+- 在 `onboard` 中设置 `--qgis-process`，或更新 config。
+
+3. 输出路径报安全错误
+- 输出路径应放在 `data/outputs`，不可写回 `data/raw`。

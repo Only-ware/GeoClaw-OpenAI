@@ -1,81 +1,79 @@
-# GeoClaw-OpenAI 框架设计（V0）
+# GeoClaw-OpenAI 框架设计（v2.3.0）
 
-## 1. 目标
+## 1. 设计目标
 
-构建一个“类似 OpenClaw 的 GeoClaw 工具”，但以 **QGIS processing 生态** 为核心执行引擎：
-
-- 执行层优先使用 `qgis_process`
-- 可选使用 PyQGIS 作为增强后端
-- 面向流程编排、可重复执行、可观察日志
+GeoClaw-OpenAI 以 QGIS Processing 为执行底座，形成 GIS 分析、制图、AI 扩展、记忆与自然语言操作的一体化框架。
 
 ## 2. 架构分层
 
-### 2.1 核心层（`core/`）
+### 2.1 CLI 编排层
 
-- `Pipeline`: 管理步骤顺序、输入输出、失败回滚策略（后续）
-- `StepSpec`: 统一步骤声明（算法名、参数、输入依赖、输出定义）
-- `ExecutionContext`: 运行上下文（工作目录、临时目录、日志）
+入口：`src/geoclaw_qgis/cli/main.py`
 
-### 2.2 执行提供层（`providers/`）
+命令域：
 
-- `QgisProcessRunner`: 调用 `qgis_process run ...`
-- `PyQgisRunner`（后续）: 使用 PyQGIS API 直接执行 processing 算法
+- `onboard/config/env`
+- `run/operator/network/skill`
+- `memory`
+- `nl`
+- `update`
 
-职责：
+### 2.2 任务记忆层
 
-- 参数序列化与命令构建
-- 标准输出/错误捕获
-- 错误码和异常统一
+组件：`src/geoclaw_qgis/memory/`
 
-### 2.3 算子层（`analysis/`）
+- 短期 memory：记录每次任务输入参数、状态、错误
+- 长期 memory：自动复盘结果
+- 归档机制：短期任务按时间迁移到 archive
+- 检索机制：基于哈希向量的相似度检索
 
-封装基础空间分析能力（算法模板 + 参数校验）：
+### 2.3 分析执行层
 
-- `buffer`
-- `clip`
-- `intersection`
-- `dissolve`
-- `reproject`
+- Pipeline 执行：`scripts/run_qgis_pipeline.py`
+- 单算法执行：`scripts/geoclaw_operator_runner.py`
+- 原生案例执行：`scripts/geoclaw_case_runner.py`
+- 轨迹网络执行：`src/geoclaw_qgis/analysis/network_ops.py`
 
-### 2.4 制图层（`cartography/`）
+### 2.4 AI 扩展层
 
-- 样式模板应用（QML/SLD）
-- 布局导出（PDF/PNG）
-- 批量出图入口
+组件：`src/geoclaw_qgis/ai/`
 
-### 2.5 I/O 层（`io/`）
+- 多 provider：OpenAI / Qwen / Gemini
+- 协议：OpenAI-compatible chat completions
+- 自动上下文压缩：长输入自动摘要保留关键信息
 
-- 数据源描述（GeoPackage / Shapefile / GeoJSON / Raster）
-- 输出管理（命名规范、版本化目录）
+### 2.5 安全控制层
 
-### 2.6 CLI 层（`cli/`）
+组件：`src/geoclaw_qgis/security/output_guard.py`
 
-- `geoclaw-openai env check`
-- `geoclaw-openai run pipeline.yaml`
-- `geoclaw-openai analysis buffer ...`
+策略：
 
-## 3. 运行模型
+- 强制输出路径位于 `data/outputs`
+- 禁止输入输出同路径（防止覆盖/删除输入）
 
-1. 解析任务配置（YAML/JSON）
-2. Pipeline 拓扑排序并校验输入依赖
-3. 调用 Provider 执行算法
-4. 记录结果、产物路径、日志
+## 3. 典型流程
 
-## 4. 最小可交付（MVP）
+1. 用户通过 CLI 或 `nl` 发起任务。
+2. CLI 记录短期 memory（start_task）。
+3. 业务模块执行（run/operator/network/skill/update）。
+4. CLI 写入任务结束状态并自动复盘到长期 memory。
+5. 结果输出在 `data/outputs` 或 memory 目录。
 
-- 环境检测命令（完成）
-- 3 个矢量分析算子（buffer/clip/dissolve）
-- 1 个制图导出流程（单布局导出 PNG）
-- 1 个 pipeline YAML 示例 + smoke test
+## 4. 扩展策略
 
-## 5. 测试策略
+- 新案例：新增 pipeline + 可选 skill 注册
+- 新 AI provider：扩展 `ExternalAIConfig.from_env`
+- 新安全策略：扩展 `validate_output_targets`
+- 新 NL 意图：扩展 `src/geoclaw_qgis/nl/intent.py`
 
-- `env smoke`: 检查 `qgis_process` / PyQGIS / GDAL
-- `operator smoke`: 小样本数据跑通
-- `golden output`: 对关键输出进行几何计数、范围、CRS 校验
+## 5. 工程约束
 
-## 6. 扩展策略
+- 输出目录约束优先于灵活性
+- memory 不影响主流程（memory 异常只告警，不阻塞业务命令）
+- 网络相关能力（TrackIntel）采用可选依赖机制
 
-- 插件式算子注册（按算法名自动发现）
-- Provider 回退机制（优先 CLI，必要时 PyQGIS）
-- 增量缓存（输入未变时跳过步骤）
+## 6. TODO（架构）
+
+- TODO: 增加 provider 级限流与重试策略。
+- TODO: 将 memory 检索升级为可插拔向量后端。
+- TODO: 引入 pipeline schema 静态校验（参数类型、引用检查）。

@@ -1,160 +1,97 @@
-# GeoClaw 原生案例与 Skill 扩展（v2.1.0）
+# GeoClaw 原生案例与 Skill 扩展（v2.3.0）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
-## 0. CLI 安装与初始化
-
-```bash
-bash scripts/install_geoclaw_openai.sh
-geoclaw-openai onboard
-source ~/.geoclaw-openai/env.sh
-```
-
 ## 1. 原生案例
 
-GeoClaw 现内置两个典型 GIS 功能案例：
+GeoClaw 原生支持两个核心 GIS 案例：
 
-- 区位分析（`location_analysis`）
-- 选址分析（`site_selection`）
+- 区位分析：`location_analysis`
+- 选址分析：`site_selection`
 
-### 1.1 区位分析
-
-配置：`pipelines/cases/location_analysis.yaml`
-
-输出：`data/outputs/wuhan_location/grid_location.gpkg`
-
-核心字段：
-
-- `LOCATION_SCORE`：区位综合评分
-- `LOCATION_LEVEL`：A/B/C/D 区位等级
-- `UNDERSERVED_NORM`：服务不足强度
-- `ACCESS_NORM`：可达性归一化
-
-运行：
+统一入口：
 
 ```bash
-bash scripts/run_location_analysis_case.sh
-
-# 或使用统一 CLI（支持城市名/bbox/本地目录）
-geoclaw-openai run --case location_analysis --city "武汉市"
-```
-
-### 1.2 选址分析
-
-配置：`pipelines/cases/site_selection.yaml`
-
-输出：`data/outputs/wuhan_site/site_candidates.gpkg`
-
-核心字段：
-
-- `SITE_RANK`：候选点排名
-- `SITE_SCORE`：选址综合评分
-- `SITE_CLASS`：候选等级（A/B/C）
-
-运行：
-
-```bash
-bash scripts/run_site_selection_case.sh
-
-# 或使用统一 CLI
-geoclaw-openai run --case site_selection --bbox "30.50,114.20,30.66,114.45"
-```
-
-一键运行两个案例：
-
-```bash
-bash scripts/run_native_cases.sh
-
-# 或使用统一 CLI
-geoclaw-openai run --case native_cases --city "武汉市"
-```
-
-### 1.3 三种输入源说明（新增）
-
-- `--city`：按城市名地理编码并下载 OSM 数据。
-- `--bbox`：按边界框下载 OSM 数据。
-- `--data-dir`：直接使用本地数据目录（目录需含 `roads.geojson`、`water.geojson`、`hospitals.geojson`、`study_area.geojson`）。
-- 三者互斥，一次运行只能指定一种输入方式。
-
-示例：
-
-```bash
-# 城市名
+# 区位 + 选址
 geoclaw-openai run --case native_cases --city "武汉市"
 
-# bbox
+# 仅区位
 geoclaw-openai run --case location_analysis --bbox "30.50,114.20,30.66,114.45"
 
-# 本地目录
+# 仅选址（本地数据）
 geoclaw-openai run --case site_selection --data-dir data/raw/wuhan_osm --skip-download
 ```
 
-## 2. Skill 扩展机制
+输入参数 `--city`、`--bbox`、`--data-dir` 互斥。
 
-GeoClaw 支持通过注册表扩展技能。
+## 2. 案例输出
+
+- 区位输出：`data/outputs/<tag>_location/grid_location.gpkg`
+- 选址输出：`data/outputs/<tag>_site/site_candidates.gpkg`
+
+关键字段：
+
+- 区位：`LOCATION_SCORE`、`LOCATION_LEVEL`、`ACCESS_NORM`、`UNDERSERVED_NORM`
+- 选址：`SITE_RANK`、`SITE_SCORE`、`SITE_CLASS`
+
+## 3. Skill 扩展机制
 
 注册表：`configs/skills_registry.json`
 
-当前内置 skill：
+内置类型：
 
-- `location_analysis`（pipeline）
-- `site_selection`（pipeline）
-- `ai_planning_assistant`（ai）
+- `pipeline`：执行空间流程
+- `ai`：调用外部 AI API
 
-### 2.1 查看和运行技能
+常用命令：
 
 ```bash
-# 列出技能
 geoclaw-openai skill -- --list
-
-# 运行区位分析技能
 geoclaw-openai skill -- --skill location_analysis
-
-# 运行选址分析技能（会先确保区位分析产物）
-geoclaw-openai skill -- --skill site_selection
+geoclaw-openai skill -- --skill site_selection --with-ai --ai-input "输出建设优先级"
 ```
 
-## 3. 外部 AI API 输入支持
+## 4. AI Provider 支持
 
-GeoClaw 使用 OpenAI-compatible Chat Completions 接口。
-
-环境变量：
-
-- `GEOCLAW_OPENAI_BASE_URL`
-- `GEOCLAW_OPENAI_API_KEY`
-- `GEOCLAW_OPENAI_MODEL`
-- `GEOCLAW_OPENAI_TIMEOUT`（可选，默认 60）
-
-### 3.1 对 pipeline 结果做 AI 总结
+支持：`openai`、`qwen`、`gemini`
 
 ```bash
-geoclaw-openai skill -- --skill site_selection --with-ai --ai-input "请重点关注候选点的公平性和可实施性"
+# 初始化时指定 provider
+geoclaw-openai onboard --non-interactive --ai-provider qwen --api-key "<QWEN_KEY>"
+
+# 后续切换
+geoclaw-openai config set --ai-provider gemini --ai-model gemini-2.0-flash
 ```
 
-### 3.2 独立调用 AI Skill
+## 5. 自动上下文压缩
+
+Skill 的 AI 输入文本过长时会自动压缩，默认开启。可通过 `GEOCLAW_AI_MAX_CONTEXT_CHARS` 调整阈值。
+
+## 6. Memory 与知识沉淀
+
+每次任务自动写短期 memory，结束后自动复盘到长期 memory；可归档与检索：
 
 ```bash
-geoclaw-openai skill -- --skill ai_planning_assistant --ai-input "根据武汉结果给出三阶段建设策略"
+geoclaw-openai memory archive --before-days 7
+geoclaw-openai memory search --query "选址评分" --scope all --top-k 5
 ```
 
-## 4. 轨迹与复杂网络模块（Trackintel）
+## 7. TrackIntel 复杂网络模块
 
-GeoClaw 提供 `geoclaw-openai network` 作为轨迹数据分析入口。
-
-测试数据：`data/examples/trajectory/trackintel_demo_pfs.csv`  
-demo 结果：`data/examples/trajectory/results/network_trackintel_demo/`
-
-运行：
+GeoClaw 支持轨迹数据复杂网络分析（算法来源：Track-Intel, MIE Lab）。
 
 ```bash
 bash scripts/run_trackintel_network_demo.sh
 ```
 
-算法来源说明：轨迹处理主链路来自 [Track-Intel（MIE Lab）](https://github.com/mie-lab/trackintel)。
+输出目录示例：`data/outputs/network_trackintel_demo/`
 
-## 5. 新增 Skill 的最小步骤
+## 8. 安全约束
 
-1. 在 `configs/skills_registry.json` 增加 skill 项。
-2. 对 `pipeline` 类型：填写 `pipeline` 路径、`report_path`。
-3. 对 `ai` 类型：填写 `system_prompt`。
-4. 用 `geoclaw-openai skill -- --list` 检查加载。
+- 所有输出必须在 `data/outputs`。
+- 禁止将输出写回输入文件。
+
+## 9. TODO（Skill 方向）
+
+- TODO: 支持 skill 级权限边界（文件、命令、网络）。
+- TODO: 支持 skill 依赖图可视化，便于复杂编排调试。

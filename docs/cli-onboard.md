@@ -1,4 +1,6 @@
-# GeoClaw CLI 安装与 Onboard（v2.1.0）
+# GeoClaw CLI 安装与 Onboard（v2.3.0）
+
+机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
 ## 1) 安装
 
@@ -6,128 +8,126 @@
 bash scripts/install_geoclaw_openai.sh
 ```
 
-安装完成后会得到 `geoclaw-openai` 命令。  
-机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
+安装后可使用命令：`geoclaw-openai`。
 
-## 2) 交互式初始化
+## 2) 首次初始化（推荐）
 
 ```bash
 geoclaw-openai onboard
 source ~/.geoclaw-openai/env.sh
 ```
 
-`env.sh` 会自动把 Python user bin（例如 `/Users/<you>/Library/Python/<ver>/bin`）加入 `PATH`，避免新终端出现 `geoclaw-openai: command not found`。
-
-`onboard` 会写入：
+初始化会写入：
 
 - `~/.geoclaw-openai/config.json`
 - `~/.geoclaw-openai/.env`
 - `~/.geoclaw-openai/env.sh`
 
-## 3) 非交互初始化（CI/自动化）
+## 3) 非交互初始化
 
 ```bash
+# OpenAI
 geoclaw-openai onboard --non-interactive \
+  --ai-provider openai \
   --api-key "<OPENAI_KEY>" \
-  --ai-base-url "https://api.openai.com/v1" \
-  --ai-model "gpt-4.1-mini" \
-  --qgis-process "/Applications/QGIS.app/Contents/MacOS/bin/qgis_process" \
-  --default-bbox "30.50,114.20,30.66,114.45" \
-  --registry "configs/skills_registry.json"
+  --ai-model "gpt-4.1-mini"
+
+# Qwen
+geoclaw-openai onboard --non-interactive \
+  --ai-provider qwen \
+  --api-key "<QWEN_KEY>" \
+  --ai-model "qwen-plus"
+
+# Gemini
+geoclaw-openai onboard --non-interactive \
+  --ai-provider gemini \
+  --api-key "<GEMINI_KEY>" \
+  --ai-model "gemini-2.0-flash"
 ```
 
-## 4) 常用命令
+可选参数：`--ai-base-url`、`--qgis-process`、`--default-bbox`、`--registry`、`--workspace`。
+
+## 4) 后续配置调整（无需重装）
 
 ```bash
+# 查看当前配置
 geoclaw-openai config show
-geoclaw-openai env
-geoclaw-openai skill -- --list
-geoclaw-openai memory status
-geoclaw-openai update --check-only
-geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
-geoclaw-openai network --pfs-csv data/examples/trajectory/trackintel_demo_pfs.csv --out-dir data/examples/trajectory/results/network_trackintel_demo --activity-time-threshold 5 --location-epsilon 80 --location-min-samples 1 --location-agg-level dataset
 
-# 按城市名运行内置案例
+# 切换 provider / 模型
+geoclaw-openai config set --ai-provider openai --ai-model gpt-4.1-mini
+geoclaw-openai config set --ai-provider qwen --ai-model qwen-plus
+geoclaw-openai config set --ai-provider gemini --ai-model gemini-2.0-flash
+
+# 一并更新 API key / URL
+geoclaw-openai config set \
+  --ai-provider gemini \
+  --ai-base-url "https://generativelanguage.googleapis.com/v1beta/openai" \
+  --api-key "<GEMINI_KEY>"
+```
+
+## 5) 常用命令清单
+
+```bash
+# 输入源：city / bbox / data-dir（三选一）
 geoclaw-openai run --case native_cases --city "武汉市"
-
-# 按 bbox 运行
 geoclaw-openai run --case location_analysis --bbox "30.50,114.20,30.66,114.45"
-
-# 按本地数据目录运行
 geoclaw-openai run --case site_selection --data-dir data/raw/wuhan_osm --skip-download
 
-# 单算法灵活运行
-geoclaw-openai operator --algorithm native:buffer --params-file configs/examples/operator_buffer_params.yaml
+# 单算法
+geoclaw-openai operator \
+  --algorithm native:buffer \
+  --params-file configs/examples/operator_buffer_params.yaml
 
-# 复杂网络分析（trackintel）
+# 自然语言（默认预览）
+geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
+geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
+
+# TrackIntel 轨迹网络
 geoclaw-openai network \
   --pfs-csv data/examples/trajectory/trackintel_demo_pfs.csv \
-  --out-dir data/examples/trajectory/results/network_trackintel_demo \
-  --activity-time-threshold 5 \
-  --location-epsilon 80 \
-  --location-min-samples 1 \
-  --location-agg-level dataset
-
-# 自然语言执行（先预览，后执行）
-geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析"
-geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
+  --out-dir data/outputs/network_trackintel_demo
 ```
 
-`geoclaw-openai run --help` 可查看全部参数（`--tag`、`--out-root`、`--with-maps` 等）。
-其中 `--city`、`--bbox`、`--data-dir` 为互斥参数。
-
-## 5) 关键环境变量
-
-- `GEOCLAW_OPENAI_BASE_URL`
-- `GEOCLAW_OPENAI_API_KEY`
-- `GEOCLAW_OPENAI_MODEL`
-- `GEOCLAW_OPENAI_QGIS_PROCESS`
-- `GEOCLAW_OPENAI_DEFAULT_BBOX`
-- `GEOCLAW_OPENAI_SKILL_REGISTRY`
-
-## 6) Memory 与 Update
-
-- 每次 `geoclaw-openai` 任务（除 `memory` 命令本身）会自动写入短期 memory，并自动复盘写入长期 memory。
-- 短期 memory 目录：`~/.geoclaw-openai/memory/short/`
-- 长期 memory 文件：`~/.geoclaw-openai/memory/long_term.jsonl`
-
-常用命令：
+## 6) Memory（短期/长期/归档/检索）
 
 ```bash
 geoclaw-openai memory status
 geoclaw-openai memory short --limit 10
 geoclaw-openai memory long --limit 10
-
-# 手工复盘某个短期任务并写入长期 memory
 geoclaw-openai memory review --task-id "<TASK_ID>" --summary "复盘总结"
+geoclaw-openai memory archive --before-days 7
+geoclaw-openai memory search --query "site selection" --scope all --top-k 5
+```
 
-# 检查更新
+默认路径：
+
+- 短期：`~/.geoclaw-openai/memory/short/`
+- 长期：`~/.geoclaw-openai/memory/long_term.jsonl`
+- 归档：`~/.geoclaw-openai/memory/archive/short/`
+
+## 7) 自动上下文压缩
+
+AI 上下文超过阈值时自动压缩，不需要手动开启。
+
+- 变量：`GEOCLAW_AI_MAX_CONTEXT_CHARS`
+- 默认：`12000`
+
+## 8) 安全策略（必须了解）
+
+- 输出必须位于 `data/outputs` 下。
+- 禁止输出覆盖输入路径（防止误删/误覆盖原始数据）。
+
+如果输出路径不安全，`run/operator/network` 会直接报错并终止。
+
+## 9) 自更新
+
+```bash
+# 检查是否有更新
 geoclaw-openai update --check-only
 
-# 拉取并更新（默认跟踪 origin/main）
+# 拉取并更新（默认 origin/main）
 geoclaw-openai update
+
+# 若仓库主分支是 master，请显式指定
+geoclaw-openai update --branch master
 ```
-
-## 7) 复杂网络分析（Trackintel）
-
-算法来源说明：轨迹处理链路基于 [Track-Intel（MIE Lab）](https://github.com/mie-lab/trackintel)。
-测试数据目录：`data/examples/trajectory/`。
-
-可选依赖安装：
-
-```bash
-python3 -m pip install --user --break-system-packages 'geoclaw-openai[network]'
-```
-
-运行 demo：
-
-```bash
-bash scripts/run_trackintel_network_demo.sh
-```
-
-输出：
-
-- `od_edges.csv`
-- `od_nodes.csv`
-- `od_trips.csv`
-- `network_summary.json`
