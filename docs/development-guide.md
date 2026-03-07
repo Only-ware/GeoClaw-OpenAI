@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 开发指南（v1.0.0）
+# GeoClaw-OpenAI 开发指南（v1.1.0）
 
 本文档面向后续开发和维护，说明 GeoClaw 的结构、目的、环境配置、安装运行和扩展方法。  
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)

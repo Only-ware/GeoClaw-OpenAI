@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 技术参考（科研与团队版，v1.0.0）
+# GeoClaw-OpenAI 技术参考（科研与团队版，v1.1.0）
 
 更新时间：2026-03-07（Asia/Shanghai）  
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
@@ -50,6 +50,7 @@ AI-Agents/
 ├── src/geoclaw_qgis/
 │   ├── cli/main.py                         # geoclaw-openai CLI
 │   ├── config.py                           # 运行时配置与环境变量
+│   ├── memory/store.py                     # 短期/长期 memory 存储与复盘
 │   ├── core/                               # Pipeline/Step 数据结构
 │   ├── providers/                          # qgis_process provider
 │   ├── skills/                             # Skill 模型与注册
@@ -57,6 +58,8 @@ AI-Agents/
 │   └── analysis/                           # Python API 封装入口
 └── pyproject.toml
 ```
+
+运行期 memory 不在仓库内，默认位于 `~/.geoclaw-openai/memory/`。
 
 ## 3. 实现原理（端到端）
 
@@ -158,6 +161,23 @@ AI-Agents/
 
 该机制使 GeoClaw 支持“空间分析 + AI 总结”的可维护扩展。
 
+## 3.6 Memory 与自更新层
+
+`geoclaw-openai` 在 CLI 主入口内置任务记忆机制：
+
+- 每次任务（除 `memory` 命令自身）先写入短期 memory。
+- 任务结束后自动生成复盘总结，并写入长期 memory。
+
+数据位置：
+
+- 短期：`~/.geoclaw-openai/memory/short/<task_id>.json`
+- 长期：`~/.geoclaw-openai/memory/long_term.jsonl`
+
+同时新增自更新能力：
+
+- `geoclaw-openai update --check-only`：检查 `origin/main` 是否有更新。
+- `geoclaw-openai update`：拉取最新代码并执行 editable 安装刷新本地 CLI。
+
 ## 4. 配置与环境变量
 
 通过 `geoclaw-openai onboard` 写入 `~/.geoclaw-openai/`：
@@ -216,6 +236,14 @@ geoclaw-openai run --case site_selection --data-dir data/raw/wuhan_osm --skip-do
 # Skill 链路
 geoclaw-openai skill -- --list
 geoclaw-openai skill -- --skill site_selection --with-ai --ai-input "输出实施优先级"
+
+# Memory 查看
+geoclaw-openai memory status
+geoclaw-openai memory short --limit 5
+geoclaw-openai memory long --limit 5
+
+# 自更新
+geoclaw-openai update --check-only
 ```
 
 ## 5.4 日常回归（day-run）

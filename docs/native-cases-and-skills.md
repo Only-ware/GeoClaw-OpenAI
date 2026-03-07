@@ -1,4 +1,4 @@
-# GeoClaw 原生案例与 Skill 扩展（v1.0.0）
+# GeoClaw 原生案例与 Skill 扩展（v1.1.0）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 

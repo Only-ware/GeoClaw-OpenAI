@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI (v1.0.0)
+# GeoClaw-OpenAI (v1.1.0)
 
 基于 `qgis_process` 的 GeoClaw 风格地理处理与制图框架。
 
@@ -10,6 +10,8 @@
 - 原生区位分析与选址分析案例
 - 专题图模板与批量导出
 - Skill 扩展机制（注册表 + 外部 AI API 输入）
+- 任务记忆系统（短期 memory + 自动复盘长期 memory）
+- 自检更新与一键拉取最新版本（`update`）
 - 本地环境检测（QGIS CLI / PyQGIS / GDAL）
 - 栅格/矢量教学 demo 与单算法灵活运行（`operator`）
 
@@ -51,6 +53,12 @@ geoclaw-openai skill -- --list
 
 # 运行选址 skill，并用外部 AI 做总结
 geoclaw-openai skill -- --skill site_selection --with-ai --ai-input "输出实施优先级"
+
+# 查看 memory 状态（短期/长期）
+geoclaw-openai memory status
+
+# 检查是否有新版本
+geoclaw-openai update --check-only
 ```
 
 外部 AI API 需设置：

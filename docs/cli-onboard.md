@@ -1,4 +1,4 @@
-# GeoClaw CLI 安装与 Onboard（v1.0.0）
+# GeoClaw CLI 安装与 Onboard（v1.1.0）
 
 ## 1) 安装
 
@@ -42,6 +42,8 @@ geoclaw-openai onboard --non-interactive \
 geoclaw-openai config show
 geoclaw-openai env
 geoclaw-openai skill -- --list
+geoclaw-openai memory status
+geoclaw-openai update --check-only
 
 # 按城市名运行内置案例
 geoclaw-openai run --case native_cases --city "武汉市"
@@ -67,3 +69,26 @@ geoclaw-openai operator --algorithm native:buffer --params-file configs/examples
 - `GEOCLAW_OPENAI_QGIS_PROCESS`
 - `GEOCLAW_OPENAI_DEFAULT_BBOX`
 - `GEOCLAW_OPENAI_SKILL_REGISTRY`
+
+## 6) Memory 与 Update
+
+- 每次 `geoclaw-openai` 任务（除 `memory` 命令本身）会自动写入短期 memory，并自动复盘写入长期 memory。
+- 短期 memory 目录：`~/.geoclaw-openai/memory/short/`
+- 长期 memory 文件：`~/.geoclaw-openai/memory/long_term.jsonl`
+
+常用命令：
+
+```bash
+geoclaw-openai memory status
+geoclaw-openai memory short --limit 10
+geoclaw-openai memory long --limit 10
+
+# 手工复盘某个短期任务并写入长期 memory
+geoclaw-openai memory review --task-id "<TASK_ID>" --summary "复盘总结"
+
+# 检查更新
+geoclaw-openai update --check-only
+
+# 拉取并更新（默认跟踪 origin/main）
+geoclaw-openai update
+```

@@ -1,5 +1,22 @@
 # GeoClaw-OpenAI Release Notes
 
+## v1.1.0 (2026-03-07)
+
+主要迭代：
+
+1. 引入任务记忆系统（Memory）
+   - 新增短期 memory：每次 CLI 任务自动写入 `~/.geoclaw-openai/memory/short/`。
+   - 新增长期 memory：任务结束后自动复盘并写入 `long_term.jsonl`。
+   - 新增 `geoclaw-openai memory` 命令（`status/short/long/review`）。
+
+2. 增加自更新能力
+   - 新增 `geoclaw-openai update --check-only`，用于检测远端是否有新提交。
+   - 新增 `geoclaw-openai update`，支持拉取最新代码并自动执行 editable 安装。
+
+3. 工程可维护性增强
+   - 文档更新，补充 Memory 与 Update 的操作流程和路径说明。
+   - 版本号升级至 `1.1.0`。
+
 ## v1.0.0 (2026-03-07)
 
 稳定发布说明：
