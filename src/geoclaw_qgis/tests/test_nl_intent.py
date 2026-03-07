@@ -41,6 +41,12 @@ class TestNLIntent(unittest.TestCase):
         self.assertIn("native:buffer", plan.cli_args)
         self.assertIn("DISTANCE=1000", plan.cli_args)
 
+    def test_network_trackintel_intent(self) -> None:
+        plan = parse_nl_query("请做复杂网络分析，使用trackintel")
+        self.assertEqual(plan.intent, "network")
+        self.assertIn("network", plan.cli_args)
+        self.assertIn("--pfs-csv", plan.cli_args)
+
 
 if __name__ == "__main__":
     unittest.main()

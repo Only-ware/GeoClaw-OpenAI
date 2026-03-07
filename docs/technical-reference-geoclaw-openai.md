@@ -12,6 +12,7 @@
 - 标准化专题图导出能力
 - 可扩展的 Skill 机制与外部 AI API 接入能力
 - 自然语言到命令计划的执行入口（`geoclaw-openai nl`）
+- 基于 trackintel 的复杂网络分析能力（`geoclaw-openai network`）
 
 核心思想：将“数据下载 -> 空间分析 -> 结果制图 -> AI 解释”串联为可自动化、可审计、可扩展的工程流程。
 
@@ -44,6 +45,7 @@ AI-Agents/
 │   ├── geoclaw_operator_runner.py          # 单算法灵活运行（param/json/file）
 │   ├── run_qgis_pipeline.py                # 通用 pipeline 执行器
 │   ├── geoclaw_skill_runner.py             # Skill 编排执行
+│   ├── run_trackintel_network_demo.sh      # trackintel 复杂网络 demo
 │   ├── export_thematic_maps.py             # 批量专题图导出
 │   ├── install_geoclaw_openai.sh           # CLI 安装
 │   ├── run_beginner_demos.sh               # 栅格/矢量教学 demo
@@ -53,6 +55,7 @@ AI-Agents/
 │   ├── config.py                           # 运行时配置与环境变量
 │   ├── memory/store.py                     # 短期/长期 memory 存储与复盘
 │   ├── nl/intent.py                        # 自然语言到 CLI 计划解析
+│   ├── analysis/network_ops.py             # trackintel 复杂网络分析封装
 │   ├── core/                               # Pipeline/Step 数据结构
 │   ├── providers/                          # qgis_process provider
 │   ├── skills/                             # Skill 模型与注册
@@ -186,7 +189,23 @@ AI-Agents/
 
 - 默认仅预览，不执行。
 - 增加 `--execute` 后执行解析出的目标命令。
-- 当前覆盖 `run` / `operator` / `skill` / `memory` / `update` 典型任务。
+- 当前覆盖 `run` / `operator` / `network` / `skill` / `memory` / `update` 典型任务。
+
+## 3.8 复杂网络分析层（Trackintel）
+
+`geoclaw-openai network` 融合 `trackintel` 处理时空轨迹并构建 OD 复杂网络，核心步骤：
+
+1. 读取 `positionfixes` CSV（`user_id`、`tracked_at`、`latitude`、`longitude`）。
+2. 生成 `staypoints`、`locations`、`triplegs`、`trips`。
+3. 将 trip 的起终点映射到 location，构建有向 OD 图。
+4. 计算网络指标：度、强度、中心性、社群。
+5. 导出 `od_edges.csv`、`od_nodes.csv`、`od_trips.csv`、`network_summary.json`。
+
+该能力为可选依赖，建议安装：
+
+```bash
+python3 -m pip install --user --break-system-packages 'geoclaw-openai[network]'
+```
 
 ## 4. 配置与环境变量
 
@@ -258,6 +277,15 @@ geoclaw-openai update --check-only
 # 自然语言（预览 + 执行）
 geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
 geoclaw-openai nl "用武汉市做选址分析，前20个，出图" --execute
+
+# 复杂网络分析（trackintel）
+geoclaw-openai network \
+  --pfs-csv data/examples/trackintel_demo_pfs.csv \
+  --out-dir data/outputs/network_trackintel_demo \
+  --activity-time-threshold 5 \
+  --location-epsilon 80 \
+  --location-min-samples 1 \
+  --location-agg-level dataset
 ```
 
 ## 5.4 日常回归（day-run）

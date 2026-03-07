@@ -200,6 +200,30 @@ def _build_operator_plan(query: str, text: str, text_lower: str) -> NLPlan:
     return NLPlan(query=query, intent="operator", confidence=0.85, reasons=reasons, cli_args=cli_args)
 
 
+def _build_network_plan(query: str, text: str, text_lower: str) -> NLPlan:
+    reasons = ["Detected complex-network/trackintel keywords."]
+    pfs_path = "data/examples/trackintel_demo_pfs.csv"
+    out_dir = "data/outputs/network_trackintel_nl"
+    paths = PATH_HINT_RE.findall(text)
+    if len(paths) >= 1:
+        pfs_path = paths[0]
+        reasons.append(f"Detected pfs path={pfs_path}.")
+    if len(paths) >= 2:
+        out_dir = paths[1]
+        reasons.append(f"Detected output dir={out_dir}.")
+    cli_args = [
+        "network",
+        "--pfs-csv",
+        pfs_path,
+        "--out-dir",
+        out_dir,
+    ]
+    if _contains_any(text_lower, ("dry-run", "dry run", "仅预览", "只预览")):
+        cli_args.append("--dry-run")
+        reasons.append("Enabled dry-run mode.")
+    return NLPlan(query=query, intent="network", confidence=0.86, reasons=reasons, cli_args=cli_args)
+
+
 def _build_run_plan(query: str, text: str, text_lower: str) -> NLPlan:
     case = _detect_case(text, text_lower)
     cli_args = ["run", "--case", case]
@@ -252,6 +276,8 @@ def parse_nl_query(query: str) -> NLPlan:
         return _build_memory_plan(text, text, text_lower)
     if _contains_any(text_lower, ("skill", "技能")):
         return _build_skill_plan(text, text, text_lower)
+    if _contains_any(text_lower, ("复杂网络", "network", "od", "trackintel", "流动网络")):
+        return _build_network_plan(text, text, text_lower)
     if _contains_any(text_lower, ("operator", "算子", "buffer", "缓冲", "单算法")):
         return _build_operator_plan(text, text, text_lower)
     return _build_run_plan(text, text, text_lower)

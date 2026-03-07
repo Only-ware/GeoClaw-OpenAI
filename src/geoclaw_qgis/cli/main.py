@@ -10,6 +10,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+from geoclaw_qgis.analysis import TrackintelIntegrationError, TrackintelNetworkService
 from geoclaw_qgis.config import (
     bootstrap_runtime_env,
     detect_qgis_process,
@@ -439,6 +440,49 @@ def cmd_operator(args: argparse.Namespace) -> int:
     return int(proc.returncode)
 
 
+def cmd_network(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    svc = TrackintelNetworkService()
+
+    columns_map: dict[str, str] | None = None
+    if args.columns_map:
+        try:
+            parsed = json.loads(args.columns_map)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"--columns-map must be valid JSON mapping: {exc}") from exc
+        if not isinstance(parsed, dict):
+            raise ValueError("--columns-map must decode to a JSON object")
+        columns_map = {str(k): str(v) for k, v in parsed.items()}
+
+    try:
+        payload = svc.run_from_positionfixes_csv(
+            pfs_csv=args.pfs_csv,
+            out_dir=args.out_dir,
+            sep=args.sep,
+            index_col=args.index_col,
+            tz=args.tz,
+            crs=args.crs,
+            columns_map=columns_map,
+            staypoint_dist_threshold=args.staypoint_dist_threshold,
+            staypoint_time_threshold=args.staypoint_time_threshold,
+            gap_threshold=args.gap_threshold,
+            activity_time_threshold=args.activity_time_threshold,
+            location_epsilon=args.location_epsilon,
+            location_min_samples=args.location_min_samples,
+            location_agg_level=args.location_agg_level,
+            dry_run=args.dry_run,
+        )
+    except TrackintelIntegrationError as exc:
+        raise RuntimeError(
+            f"{exc}\n"
+            "Install optional deps: pip install 'geoclaw-openai[network]' "
+            "or pip install trackintel networkx pandas."
+        ) from exc
+
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="geoclaw-openai",
@@ -514,6 +558,38 @@ def build_parser() -> argparse.ArgumentParser:
     operator.add_argument("--params-file", default="", help="json/yaml file containing params")
     operator.add_argument("--dry-run", action="store_true", help="print command without execution")
     operator.set_defaults(func=cmd_operator)
+
+    network = sub.add_parser("network", help="complex mobility network analysis via trackintel")
+    network.add_argument("--pfs-csv", required=True, help="positionfix csv path")
+    network.add_argument("--out-dir", default="data/outputs/network_trackintel", help="output directory")
+    network.add_argument("--sep", default=",", help="csv separator")
+    network.add_argument("--index-col", default="", help="optional index column name")
+    network.add_argument("--tz", default="UTC", help="timezone for tracked_at parsing")
+    network.add_argument("--crs", default="EPSG:4326", help="coordinate reference system")
+    network.add_argument(
+        "--columns-map",
+        default="",
+        help='json mapping for input columns, e.g. {"time":"tracked_at","uid":"user_id"}',
+    )
+    network.add_argument("--staypoint-dist-threshold", type=float, default=100.0, help="staypoint distance threshold (m)")
+    network.add_argument("--staypoint-time-threshold", type=float, default=5.0, help="staypoint time threshold (min)")
+    network.add_argument("--gap-threshold", type=float, default=15.0, help="tripleg/trip gap threshold (min)")
+    network.add_argument(
+        "--activity-time-threshold",
+        type=float,
+        default=15.0,
+        help="staypoint activity threshold for trip generation (min)",
+    )
+    network.add_argument("--location-epsilon", type=float, default=100.0, help="DBSCAN epsilon for locations (m)")
+    network.add_argument("--location-min-samples", type=int, default=2, help="DBSCAN min samples for locations")
+    network.add_argument(
+        "--location-agg-level",
+        default="user",
+        choices=["user", "dataset"],
+        help="location aggregation level",
+    )
+    network.add_argument("--dry-run", action="store_true", help="only print resolved parameters")
+    network.set_defaults(func=cmd_network)
 
     memory = sub.add_parser("memory", help="manage short-term and long-term task memory")
     memory_sub = memory.add_subparsers(dest="memory_cmd", required=True)
