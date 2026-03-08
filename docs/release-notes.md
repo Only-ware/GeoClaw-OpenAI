@@ -1,13 +1,25 @@
 # GeoClaw-OpenAI Release Notes
 
-## v2.3.3 (2026-03-07)
+## v2.3.4 (2026-03-08)
 
 主要迭代：
 
 1. 版本升级
-   - 包版本与运行时版本升级为 `2.3.3`。
+   - 包版本与运行时版本升级为 `2.3.4`。
 
-2. 模型配置与文档同步
+2. Skill 能力增强（商场选址）
+   - 新增 `mall_site_selection_llm`：基于大模型策略推理的选址 Skill 案例。
+   - 新增 `mall_site_selection_qgis`：基于 QGIS Processing 的可复现选址 Skill 案例。
+
+3. Skill 安全门禁
+   - 新增 `skill-registry assess` 与 `skill-registry register` 工作流。
+   - 支持注册前风险评估，`high` 风险默认阻断，并要求用户确认后注册。
+
+4. Skill 文档体系补全
+   - 新增 Skill 编写规范文档、商场选址案例说明、安全评估说明文档。
+   - README 补充上述能力的简要命令示例。
+
+5. 模型配置与文档同步
    - README 与 docs 全面更新为最新模型族示例（GPT-5、Gemini 3.x、Qwen3）。
    - CLI 默认 provider 预设模型更新为：`gpt-5-mini`、`qwen-plus-latest`、`gemini-flash-latest`。
    - `day_run` 默认模型同步更新为 `gpt-5-mini`。

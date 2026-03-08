@@ -1,4 +1,4 @@
-# 武汉 OSM 测试流程（v2.3.3）
+# 武汉 OSM 测试流程（v2.3.4）
 
 本文档用于复现实验：下载数据 -> 空间分析 -> 出图。
 
@@ -62,7 +62,7 @@ ogrinfo -so -al data/outputs/wuhan_analysis/grid_clustered.gpkg
 
 ## 5) 安全策略说明
 
-GeoClaw v2.3.3 默认启用输出安全控制：
+GeoClaw v2.3.4 默认启用输出安全控制：
 
 - 输出必须在 `data/outputs`
 - 禁止覆盖输入文件

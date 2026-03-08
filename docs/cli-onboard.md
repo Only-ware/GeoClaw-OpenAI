@@ -1,4 +1,4 @@
-# GeoClaw CLI 安装与 Onboard（v2.3.3）
+# GeoClaw CLI 安装与 Onboard（v2.3.4）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
@@ -94,6 +94,9 @@ geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 geoclaw-openai network \
   --pfs-csv data/examples/trajectory/trackintel_demo_pfs.csv \
   --out-dir data/outputs/network_trackintel_demo
+
+# Skill 安全评估（注册前）
+geoclaw-openai skill-registry assess --spec-file configs/examples/high_risk_skill_injection.json
 ```
 
 ## 6) Memory（短期/长期/归档/检索）

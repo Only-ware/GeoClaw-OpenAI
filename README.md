@@ -1,30 +1,45 @@
-# GeoClaw-OpenAI (v2.3.3)
+# GeoClaw-OpenAI (v2.3.4)
 
 GeoClaw-OpenAI 是一个基于 `QGIS Processing (qgis_process)` 的空间分析与制图工具链，面向科研和工程团队，支持从数据获取、分析建模、结果制图到 AI 解释的完整流程。
 
 机构：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
-## 1. v2.3.3 新增能力（重点）
+## 1. v2.3.4 新增能力（重点）
 
 本次版本重点新增以下能力：
 
-1. 自动上下文压缩
-- AI 输入上下文过长时自动压缩（保留头部、关键词片段、尾部）。
-- 默认自动触发，不需要手动开启。
-- 可通过环境变量 `GEOCLAW_AI_MAX_CONTEXT_CHARS` 调整阈值。
+1. 商场选址 Skill 双写法（新增案例）
+- `mall_site_selection_llm`：大模型策略推理写法。
+- `mall_site_selection_qgis`：QGIS Processing 可复现计算写法。
 
-2. 多 Provider 支持
-- 支持 `openai`、`qwen`、`gemini`。
-- `onboard` 可直接设置 provider；后续可通过 `config set` 切换 provider 和模型。
+2. Skill 注册前安全门禁（新增）
+- 新增 `skill-registry assess` 与 `skill-registry register`。
+- 注册前自动评估风险等级；`high` 风险默认阻断。
+- 注册动作必须用户确认（`--confirm` 或交互 `YES`）。
 
-3. Memory 存档与向量检索
-- 新增 `memory archive`：归档短期记忆。
-- 新增 `memory search`：基于向量检索历史记忆（short/long/archive/all）。
+3. Skill 编写规范文档（新增）
+- 新增 Skill 编写规范与评审清单。
+- 新增安全门禁说明与高危样例。
 
-4. 安全写入机制
-- 输出目录固定在 `data/outputs` 下。
-- 阻止 in-place 输出覆盖输入文件。
-- 已接入 `run`/`operator`/`network`/pipeline 主链路。
+4. 模型与运行链路同步
+- 默认模型保持最新族：`gpt-5-mini`、`qwen-plus-latest`、`gemini-flash-latest`。
+- `day_run`、CLI 默认配置与文档示例一致。
+
+### 1.1 新增能力简要使用
+
+```bash
+# 商场选址：LLM 写法
+geoclaw-openai skill -- --skill mall_site_selection_llm --ai-input "给出武汉商场选址策略"
+
+# 商场选址：QGIS 写法
+geoclaw-openai skill -- --skill mall_site_selection_qgis --skip-download
+
+# 注册前安全评估
+geoclaw-openai skill-registry assess --spec-file configs/examples/high_risk_skill_injection.json
+
+# 注册（需要确认）
+geoclaw-openai skill-registry register --spec-file configs/examples/new_skill.json --confirm
+```
 
 ## 2. 核心能力总览
 
@@ -254,10 +269,13 @@ geoclaw-openai update --help
 ## 12. 文档导航
 
 - 技术参考：`docs/technical-reference-geoclaw-openai.md`
-- 全量复盘：`docs/geoclaw-full-retrospective-v2.3.3.md`
+- 全量复盘：`docs/geoclaw-full-retrospective-v2.3.4.md`
 - 开发指南：`docs/development-guide.md`
 - 科研学习手册：`docs/scientist-learning-guide.md`
 - 原生案例与 Skill：`docs/native-cases-and-skills.md`
+- Skill 案例（商场选址双写法）：`docs/skill-case-mall-site-selection.md`
+- Skill 编写规范：`docs/skill-authoring-spec.md`
+- Skill 安全门禁：`docs/skill-security-guard.md`
 - CLI 安装与初始化：`docs/cli-onboard.md`
 - 版本记录：`docs/release-notes.md`
 - Changelog：`CHANGELOG.md`

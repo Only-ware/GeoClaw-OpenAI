@@ -1,4 +1,4 @@
-# GeoClaw 原生案例与 Skill 扩展（v2.3.3）
+# GeoClaw 原生案例与 Skill 扩展（v2.3.4）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
@@ -49,6 +49,12 @@ geoclaw-openai run --case site_selection --data-dir data/raw/wuhan_osm --skip-do
 geoclaw-openai skill -- --list
 geoclaw-openai skill -- --skill location_analysis
 geoclaw-openai skill -- --skill site_selection --with-ai --ai-input "输出建设优先级"
+
+# 新增：商场选址（QGIS Processing）
+geoclaw-openai skill -- --skill mall_site_selection_qgis --skip-download
+
+# 新增：商场选址（LLM）
+geoclaw-openai skill -- --skill mall_site_selection_llm --ai-input "基于武汉区位指标给出商场选址策略"
 ```
 
 ## 4. AI Provider 支持
