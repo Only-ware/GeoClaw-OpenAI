@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.3.4] - 2026-03-08
+
+### Added
+- Added mall site-selection Skill examples in two styles:
+  - `mall_site_selection_llm` (LLM reasoning style)
+  - `mall_site_selection_qgis` (QGIS Processing reproducible style)
+- Added Skill security assessment guard and high-risk injection simulation examples.
+- Added Skill authoring specification and case documentation for team onboarding.
+
+### Changed
+- Bumped project version to `2.3.4`.
+- Updated README usage notes for mall-site Skill, pre-registration security assessment, and Skill authoring docs.
+- Refreshed engineering manual outputs (`GeoClaw-OpenAI_工程说明书.docx` and PDF companion) for the current version.
+
 ## [2.3.3] - 2026-03-07
 
 ### Changed

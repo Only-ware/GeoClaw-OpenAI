@@ -1,0 +1,73 @@
+name: geoclaw_mall_site_selection_qgis
+version: 1.0
+
+description: >-
+  Mall site selection by QGIS processing. Uses location-analysis grid output
+  and produces ranked mall candidate points.
+
+variables:
+  location_input: data/outputs/wuhan_location/grid_location.gpkg
+  out_dir: data/outputs/mall_site_qgis
+  top_n: 15
+
+steps:
+  - id: mall_feasible_cells
+    algorithm: native:extractbyexpression
+    params:
+      INPUT: ${location_input}
+      EXPRESSION: "\"ACCESS_NORM\" >= 0.55 AND \"HEAT_NORM\" >= 0.40 AND \"SAFETY_NORM\" >= 0.45"
+      OUTPUT: ${out_dir}/mall_feasible_cells.gpkg
+
+  - id: mall_score
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${mall_feasible_cells.OUTPUT}
+      FIELD_NAME: MALL_SCORE
+      FIELD_TYPE: 0
+      FIELD_LENGTH: 16
+      FIELD_PRECISION: 4
+      FORMULA: "round(100 * (0.35 * \"ACCESS_NORM\" + 0.30 * \"HEAT_NORM\" + 0.20 * \"RD_NORM\" + 0.15 * \"SAFETY_NORM\"), 4)"
+      OUTPUT: ${out_dir}/mall_scored_cells.gpkg
+
+  - id: mall_rank
+    algorithm: native:addautoincrementalfield
+    params:
+      INPUT: ${mall_score.OUTPUT}
+      FIELD_NAME: MALL_RANK
+      START: 1
+      SORT_EXPRESSION: "\"MALL_SCORE\""
+      SORT_ASCENDING: 0
+      SORT_NULLS_FIRST: 0
+      OUTPUT: ${out_dir}/mall_ranked_cells.gpkg
+
+  - id: mall_class
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${mall_rank.OUTPUT}
+      FIELD_NAME: MALL_CLASS
+      FIELD_TYPE: 2
+      FIELD_LENGTH: 12
+      FIELD_PRECISION: 0
+      FORMULA: "case when \"MALL_SCORE\" >= 60 then 'CORE_A' when \"MALL_SCORE\" >= 50 then 'CORE_B' else 'CORE_C' end"
+      OUTPUT: ${out_dir}/mall_class_cells.gpkg
+
+  - id: mall_top_cells
+    algorithm: native:extractbyexpression
+    params:
+      INPUT: ${mall_class.OUTPUT}
+      EXPRESSION: "\"MALL_RANK\" <= ${top_n}"
+      OUTPUT: ${out_dir}/mall_top_cells.gpkg
+
+  - id: mall_top_centroids
+    algorithm: native:centroids
+    params:
+      INPUT: ${mall_top_cells.OUTPUT}
+      ALL_PARTS: 0
+      OUTPUT: ${out_dir}/mall_candidates_raw.gpkg
+
+  - id: mall_candidates_final
+    algorithm: native:retainfields
+    params:
+      INPUT: ${mall_top_centroids.OUTPUT}
+      FIELDS: MALL_RANK;MALL_SCORE;MALL_CLASS;LOCATION_SCORE;LOCATION_LEVEL;ACCESS_NORM;HEAT_NORM;RD_NORM;SAFETY_NORM;SERVICE_NORM;NN_HubDist
+      OUTPUT: ${out_dir}/mall_candidates.gpkg

@@ -27,6 +27,21 @@
       "type": "ai",
       "description": "Use external AI API to summarize planning insights from GeoClaw outputs.",
       "system_prompt": "You are a GIS planning analyst. Summarize spatial priorities, risks, and action steps based on provided GeoClaw outputs."
+    },
+    {
+      "id": "mall_site_selection_qgis",
+      "type": "pipeline",
+      "description": "Run mall site selection by QGIS processing from location-analysis output.",
+      "pipeline": "pipelines/cases/mall_site_selection_qgis.yaml",
+      "requires_osm": false,
+      "default_bbox": "30.50,114.20,30.66,114.45",
+      "report_path": "data/outputs/mall_site_qgis/pipeline_report.json"
+    },
+    {
+      "id": "mall_site_selection_llm",
+      "type": "ai",
+      "description": "Use LLM to generate mall site selection strategy and explainable ranking rules.",
+      "system_prompt": "You are a senior commercial-location analyst. Build a mall site selection plan from user inputs and GeoClaw indicators. Output structure: 1) objective and constraints, 2) scoring formula with weights, 3) top candidate zone profile, 4) risk list and mitigation, 5) field checklist for validation."
     }
   ]
 }

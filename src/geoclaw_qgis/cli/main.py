@@ -27,6 +27,7 @@ from geoclaw_qgis.memory import TaskMemoryStore
 from geoclaw_qgis.nl import NLPlan, parse_nl_query
 from geoclaw_qgis.project_info import LAB_AFFILIATION, PROJECT_NAME, PROJECT_VERSION
 from geoclaw_qgis.security import OutputSecurityError, fixed_output_root, validate_output_targets
+from geoclaw_qgis.skills import assess_skill_spec, load_skill_spec_file, upsert_skill_registry
 
 
 DEFAULT_BBOX = "30.50,114.20,30.66,114.45"
@@ -579,6 +580,95 @@ def cmd_skill(args: argparse.Namespace) -> int:
     return os.spawnvp(os.P_WAIT, cmd[0], cmd)
 
 
+def _append_skill_guard_log(event: dict[str, object]) -> None:
+    sec_dir = geoclaw_home() / "security"
+    sec_dir.mkdir(parents=True, exist_ok=True)
+    log_file = sec_dir / "skill_guard_log.jsonl"
+    row = dict(event)
+    row["ts"] = dt.datetime.now(dt.timezone.utc).isoformat()
+    with log_file.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row, ensure_ascii=False) + "\n")
+
+
+def _resolve_registry_path(path_text: str) -> Path:
+    root = resolve_workspace_root()
+    raw = (path_text or os.environ.get("GEOCLAW_OPENAI_SKILL_REGISTRY", DEFAULT_REGISTRY)).strip() or DEFAULT_REGISTRY
+    path = Path(raw).expanduser()
+    if not path.is_absolute():
+        path = (root / path).resolve()
+    return path
+
+
+def cmd_skill_registry_assess(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    root = resolve_workspace_root()
+    spec_path = Path(args.spec_file).expanduser().resolve()
+    if not spec_path.exists():
+        raise FileNotFoundError(f"skill spec file not found: {spec_path}")
+
+    spec = load_skill_spec_file(spec_path)
+    report = assess_skill_spec(spec, workspace_root=root)
+    payload = {
+        "spec_file": str(spec_path),
+        "workspace": str(root),
+        "registry": str(_resolve_registry_path(args.registry)),
+        "assessment": report,
+    }
+    _append_skill_guard_log({"action": "assess", **payload})
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_skill_registry_register(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    root = resolve_workspace_root()
+    spec_path = Path(args.spec_file).expanduser().resolve()
+    if not spec_path.exists():
+        raise FileNotFoundError(f"skill spec file not found: {spec_path}")
+
+    spec = load_skill_spec_file(spec_path)
+    assessment = assess_skill_spec(spec, workspace_root=root)
+    registry_path = _resolve_registry_path(args.registry)
+
+    if assessment.get("risk_level") == "high" and not args.allow_high_risk:
+        _append_skill_guard_log(
+            {
+                "action": "register_blocked",
+                "spec_file": str(spec_path),
+                "registry": str(registry_path),
+                "assessment": assessment,
+                "reason": "high_risk_requires_allow_high_risk",
+            }
+        )
+        raise RuntimeError(
+            "Skill assessment risk_level=high. Registration blocked. "
+            "Review findings and use --allow-high-risk with explicit confirmation if you still want to proceed."
+        )
+
+    confirmed = bool(args.confirm)
+    if not confirmed:
+        if not sys.stdin.isatty():
+            raise ValueError("--confirm is required in non-interactive mode.")
+        prompt = "Assessment complete. Type YES to confirm registration: "
+        answer = input(prompt).strip()
+        confirmed = answer == "YES"
+    if not confirmed:
+        print(json.dumps({"registered": False, "reason": "user_not_confirmed", "assessment": assessment}, ensure_ascii=False, indent=2))
+        return 1
+
+    result = upsert_skill_registry(registry_path, skill_spec=spec, replace=bool(args.replace))
+    payload = {
+        "registered": True,
+        "spec_file": str(spec_path),
+        "registry": str(registry_path),
+        "assessment": assessment,
+        "result": result,
+    }
+    _append_skill_guard_log({"action": "register", **payload})
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
 def cmd_run(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
     cmd = build_runner_cmd("geoclaw_case_runner.py")
@@ -748,6 +838,22 @@ def build_parser() -> argparse.ArgumentParser:
     skill = sub.add_parser("skill", help="proxy to scripts/geoclaw_skill_runner.py")
     skill.add_argument("extra", nargs=argparse.REMAINDER, help="args passed to skill runner")
     skill.set_defaults(func=cmd_skill)
+
+    skill_registry = sub.add_parser("skill-registry", help="assess and register skills with security guard")
+    skill_registry_sub = skill_registry.add_subparsers(dest="skill_registry_cmd", required=True)
+
+    skill_assess = skill_registry_sub.add_parser("assess", help="assess risk for one skill spec JSON")
+    skill_assess.add_argument("--spec-file", required=True, help="path to one skill JSON object file")
+    skill_assess.add_argument("--registry", default="", help="target skills registry path")
+    skill_assess.set_defaults(func=cmd_skill_registry_assess)
+
+    skill_register = skill_registry_sub.add_parser("register", help="register skill after assessment and confirmation")
+    skill_register.add_argument("--spec-file", required=True, help="path to one skill JSON object file")
+    skill_register.add_argument("--registry", default="", help="target skills registry path")
+    skill_register.add_argument("--replace", action="store_true", help="replace existing skill id if exists")
+    skill_register.add_argument("--allow-high-risk", action="store_true", help="allow high-risk skill registration")
+    skill_register.add_argument("--confirm", action="store_true", help="confirm registration without interactive prompt")
+    skill_register.set_defaults(func=cmd_skill_registry_register)
 
     run = sub.add_parser("run", help="run built-in cases with city/bbox/local data")
     run.add_argument(
