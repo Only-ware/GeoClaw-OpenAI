@@ -165,6 +165,73 @@ geoclaw-openai nl "武汉最适合建商场的前5个地点，输出结果和简
 
 看到 `command_preview`/`cli_args` 即表示安装与配置成功（未执行分析）。
 
+### 3.6 Windows（PowerShell）安装流程 + QGIS 安装
+
+适用人群：Windows 新手用户，不熟悉 Python/GIS 环境配置。
+
+先准备两个基础工具：
+1. Git（用于 `git clone`）
+2. Python 3.10+（安装时勾选 “Add python.exe to PATH”）
+
+#### 3.6.1 先安装 QGIS（必须）
+
+1. 打开 QGIS 官网下载页：<https://qgis.org/download/>
+2. 选择 Windows 版本，优先安装 LTR（长期支持版）或最新稳定版。
+3. 按默认选项安装完成后，确认以下文件存在（版本号目录可能不同）：
+   - `C:\Program Files\QGIS <version>\bin\qgis_process.exe`
+
+在 PowerShell 里可自动查找 `qgis_process.exe`：
+
+```powershell
+Get-ChildItem "C:\Program Files\QGIS*" -Recurse -Filter qgis_process.exe -ErrorAction SilentlyContinue |
+  Select-Object -First 1 -ExpandProperty FullName
+```
+
+如果命令有返回路径，说明 QGIS 核心工具已可用。
+
+#### 3.6.2 PowerShell 从仓库安装 GeoClaw
+
+```powershell
+# 1) 克隆仓库
+git clone https://github.com/whuyao/GeoClaw-OpenAI.git
+cd GeoClaw-OpenAI
+
+# 2) 安装 GeoClaw（用户级）
+py -3 -m pip install --user -e .
+
+# 3) 把 Python Scripts 目录加入当前 PowerShell PATH（临时）
+$USER_BASE = py -3 -m site --user-base
+$SCRIPTS = Join-Path $USER_BASE "Scripts"
+$env:Path = "$SCRIPTS;$env:Path"
+
+# 4) 验证 CLI
+geoclaw-openai --help
+```
+
+如需永久写入用户 PATH（仅需一次）：
+
+```powershell
+[Environment]::SetEnvironmentVariable("Path", "$SCRIPTS;$([Environment]::GetEnvironmentVariable('Path','User'))", "User")
+```
+
+#### 3.6.3 Windows 上执行 onboard
+
+```powershell
+# 将下面路径替换为你机器实际 qgis_process 路径
+geoclaw-openai onboard --qgis-process "C:\Program Files\QGIS 3.40.0\bin\qgis_process.exe"
+```
+
+Windows 下不需要执行 `source ~/.geoclaw-openai/env.sh`。  
+`onboard` 写入的配置会由 GeoClaw CLI 自动读取。
+
+#### 3.6.4 Windows 快速自检
+
+```powershell
+geoclaw-openai config show
+geoclaw-openai skill -- --list
+geoclaw-openai nl "武汉最适合建商场的前5个地点，输出结果和简要解释"
+```
+
 非交互配置示例：
 
 ```bash
