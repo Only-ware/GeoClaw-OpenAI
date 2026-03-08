@@ -90,19 +90,80 @@ geoclaw-openai skill-registry register --spec-file configs/examples/new_skill.js
 - Mobility（轨迹）分析（Track-Intel 融合）
 - 自更新能力（`geoclaw-openai update`）
 
-## 3. 安装与初始化
+## 3. 安装与初始化（新手完整流程）
+
+### 3.1 从 GitHub 克隆项目
 
 ```bash
-# 1) 环境检测
+# 1) 克隆仓库
+git clone https://github.com/whuyao/GeoClaw-OpenAI.git
+
+# 2) 进入项目目录
+cd GeoClaw-OpenAI
+```
+
+如果你已经克隆过，可先更新到最新代码：
+
+```bash
+cd GeoClaw-OpenAI
+git pull origin main
+```
+
+### 3.2 检查本地环境
+
+```bash
 bash scripts/check_local_env.sh
+```
 
-# 2) 安装 CLI
+该脚本会检查 `python3`、`qgis_process` 等关键依赖是否可用。
+
+### 3.3 安装 CLI 命令
+
+```bash
 bash scripts/install_geoclaw_openai.sh
+```
 
-# 3) 首次配置（交互式）
+安装后验证：
+
+```bash
+geoclaw-openai --help
+```
+
+如果提示 `command not found`，通常是用户级 Python bin 不在 PATH。可执行：
+
+```bash
+# macOS/Linux 常见修复
+export PATH="$HOME/Library/Python/3.14/bin:$PATH"
+# 或（部分系统）
+export PATH="$HOME/.local/bin:$PATH"
+```
+
+你也可以把上面 `export` 写进 `~/.zshrc` 或 `~/.bashrc` 后重新打开终端。
+
+### 3.4 首次配置（onboard）
+
+```bash
 geoclaw-openai onboard
 source ~/.geoclaw-openai/env.sh
 ```
+
+`onboard` 会引导你设置：
+- AI Provider（OpenAI / Qwen / Gemini / Ollama）
+- API Key（Ollama 本地模式可留空）
+- AI Base URL / Model
+- 默认 BBOX
+- 默认工作目录、技能注册表路径
+- `qgis_process` 路径
+
+### 3.5 新手第一条验证命令
+
+```bash
+geoclaw-openai config show
+geoclaw-openai skill -- --list
+geoclaw-openai nl "武汉最适合建商场的前5个地点，输出结果和简要解释"
+```
+
+看到 `command_preview`/`cli_args` 即表示安装与配置成功（未执行分析）。
 
 非交互配置示例：
 
