@@ -86,3 +86,11 @@ geoclaw-openai nl "武汉最适合建商场的前5个地点"
 - 默认模型或 provider 变更
 - 样例输出路径变化
 - 新手入口命令变化
+
+建议每次发布前额外执行：
+
+```bash
+bash scripts/e2e_complex_nl_suite.sh
+```
+
+用于验证自然语言端到端能力在复杂场景下仍可用。

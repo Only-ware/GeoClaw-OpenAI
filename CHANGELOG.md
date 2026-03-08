@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [3.0.0-maintenance] - 2026-03-08
+
+### Added
+- Added complex NL end-to-end regression suite:
+  - `scripts/e2e_complex_nl_suite.sh`
+  - Covers mall site-selection, local data-dir location analysis, trajectory network, and operator parameter-preservation scenarios.
+
+### Changed
+- Updated NL routing constraints for generic safety and parameter preservation:
+  - `run` intent now only allows SRE reroute to `run/skill`.
+  - Preserves explicit NL parameters after SRE routing for `run`, `network`, and `operator` intents.
+- Updated `.gitignore` to stop ignoring `data/` so learning datasets/examples remain trackable.
+- Updated README/docs and regenerated engineering manual docx/pdf for the maintenance cycle.
+
 ## [3.0.0] - 2026-03-08
 
 ### Added

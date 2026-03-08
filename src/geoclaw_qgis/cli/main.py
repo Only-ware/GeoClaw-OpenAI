@@ -687,6 +687,22 @@ def _extract_flag_value(cli_args: list[str], flag: str) -> str:
     return str(cli_args[idx + 1]).strip()
 
 
+def _extract_flag_values(cli_args: list[str], flag: str) -> list[str]:
+    out: list[str] = []
+    i = 0
+    n = len(cli_args)
+    while i < n:
+        token = str(cli_args[i])
+        if token == flag and i + 1 < n:
+            value = str(cli_args[i + 1]).strip()
+            if value:
+                out.append(value)
+            i += 2
+            continue
+        i += 1
+    return out
+
+
 def _remove_flag_with_value(cli_args: list[str], flag: str) -> list[str]:
     out: list[str] = []
     i = 0
@@ -718,11 +734,11 @@ def _enforce_nl_route_constraints(
     route_notes: list[str],
 ) -> list[str]:
     args = [str(x) for x in routed_cli_args if str(x).strip()]
+    base = [str(x) for x in plan.cli_args if str(x).strip()]
     if not args:
         return args
 
     if plan.intent == "run" and args[0] == "run":
-        base = [str(x) for x in plan.cli_args if str(x).strip()]
         for source_flag in _RUN_SOURCE_FLAGS:
             source_value = _extract_flag_value(base, source_flag)
             if source_value:
@@ -744,6 +760,46 @@ def _enforce_nl_route_constraints(
             if bool_flag in base and bool_flag not in args:
                 args.append(bool_flag)
                 route_notes.append(f"Preserved explicit NL switch: {bool_flag}.")
+
+    if plan.intent == "network" and args[0] == "network":
+        for value_flag in ("--pfs-csv", "--out-dir", "--sep", "--index-col", "--tz", "--crs", "--columns-map"):
+            value = _extract_flag_value(base, value_flag)
+            if value:
+                current = _extract_flag_value(args, value_flag)
+                if current != value:
+                    args = _ensure_flag_with_value(args, value_flag, value)
+                    route_notes.append(f"Preserved explicit NL parameter: {value_flag}={value}.")
+        if "--dry-run" in base and "--dry-run" not in args:
+            args.append("--dry-run")
+            route_notes.append("Preserved explicit NL switch: --dry-run.")
+
+    if plan.intent == "operator" and args[0] == "operator":
+        algo = _extract_flag_value(base, "--algorithm")
+        if algo:
+            current_algo = _extract_flag_value(args, "--algorithm")
+            if current_algo != algo:
+                args = _ensure_flag_with_value(args, "--algorithm", algo)
+                route_notes.append(f"Preserved explicit NL parameter: --algorithm={algo}.")
+
+        for repeat_flag in ("--param", "--param-json"):
+            values = _extract_flag_values(base, repeat_flag)
+            if values:
+                args = _remove_flag_with_value(args, repeat_flag)
+                for value in values:
+                    args.extend([repeat_flag, value])
+                route_notes.append(f"Preserved explicit NL parameter list: {repeat_flag} ({len(values)} items).")
+
+        for value_flag in ("--params-file", "--step-id", "--qgis-process"):
+            value = _extract_flag_value(base, value_flag)
+            if value:
+                current = _extract_flag_value(args, value_flag)
+                if current != value:
+                    args = _ensure_flag_with_value(args, value_flag, value)
+                    route_notes.append(f"Preserved explicit NL parameter: {value_flag}={value}.")
+
+        if "--dry-run" in base and "--dry-run" not in args:
+            args.append("--dry-run")
+            route_notes.append("Preserved explicit NL switch: --dry-run.")
 
     return args
 

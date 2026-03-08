@@ -239,7 +239,7 @@ class TestNLSRERouting(unittest.TestCase):
         self.assertEqual(rc, 0)
         payload = _extract_payload(out)
         self.assertEqual(payload["intent"], "network")
-        self.assertEqual(payload["cli_args"], ["network", "--pfs-csv", "y.csv"])
+        self.assertEqual(payload["cli_args"], ["network", "--pfs-csv", "x.csv"])
         self.assertTrue(any("execution plan applied" in x for x in payload["tool_route_notes"]))
 
     @patch("geoclaw_qgis.cli.main.bootstrap_runtime_env")
@@ -363,6 +363,84 @@ class TestNLSRERouting(unittest.TestCase):
         self.assertIn("--with-maps", payload["cli_args"])
         self.assertTrue(any("Preserved explicit input source" in x for x in payload["tool_route_notes"]))
         self.assertTrue(any("Preserved explicit NL parameter" in x for x in payload["tool_route_notes"]))
+
+    @patch("geoclaw_qgis.cli.main.bootstrap_runtime_env")
+    @patch("geoclaw_qgis.cli.main.get_session_profile")
+    @patch("geoclaw_qgis.cli.main.parse_nl_query")
+    @patch("geoclaw_qgis.cli.main.run_spatial_reasoning")
+    @patch("geoclaw_qgis.cli.main.build_reasoning_input_from_profile")
+    @patch("geoclaw_qgis.cli.main._collect_reasoning_datasets")
+    def test_network_intent_preserves_explicit_out_dir_after_sre_reroute(
+        self,
+        mock_collect: Mock,
+        mock_build_input: Mock,
+        mock_run_sre: Mock,
+        mock_parse: Mock,
+        mock_session: Mock,
+        _mock_bootstrap: Mock,
+    ) -> None:
+        mock_collect.return_value = []
+        mock_build_input.return_value = object()
+        mock_parse.return_value = NLPlan(
+            query="复杂网络分析并输出到 data/outputs/network_e2e_case",
+            intent="network",
+            confidence=0.9,
+            reasons=["network"],
+            cli_args=[
+                "network",
+                "--pfs-csv",
+                "data/examples/trajectory/trackintel_demo_pfs.csv",
+                "--out-dir",
+                "data/outputs/network_e2e_case",
+            ],
+        )
+        mock_session.return_value = type("S", (), {"soul_path": "soul.md", "user_path": "user.md"})()
+        mock_run_sre.return_value = _FakeSRE(
+            {
+                "validation": {"status": "pass"},
+                "execution_plan": {
+                    "safe_to_execute": True,
+                    "route_target": "network",
+                    "command": [
+                        "network",
+                        "--pfs-csv",
+                        "data/examples/trajectory/trackintel_demo_pfs.csv",
+                        "--out-dir",
+                        "data/outputs/network_trackintel_sre",
+                    ],
+                },
+            },
+            status="pass",
+            task_type="trajectory_analysis",
+        )
+
+        args = argparse.Namespace(
+            query=["复杂网络分析并输出到 data/outputs/network_e2e_case"],
+            use_sre=True,
+            sre_strict=False,
+            sre_data_dir="",
+            sre_datasets_file="",
+            execute=False,
+        )
+        with io.StringIO() as buf, redirect_stdout(buf):
+            rc = cmd_nl(args)
+            out = buf.getvalue()
+
+        self.assertEqual(rc, 0)
+        payload = _extract_payload(out)
+        self.assertEqual(
+            payload["cli_args"],
+            [
+                "network",
+                "--pfs-csv",
+                "data/examples/trajectory/trackintel_demo_pfs.csv",
+                "--out-dir",
+                "data/outputs/network_e2e_case",
+            ],
+        )
+        self.assertTrue(
+            any("Preserved explicit NL parameter: --out-dir=data/outputs/network_e2e_case." in x for x in payload["tool_route_notes"])
+        )
 
     @patch("geoclaw_qgis.cli.main.bootstrap_runtime_env")
     @patch("geoclaw_qgis.cli.main.get_session_profile")

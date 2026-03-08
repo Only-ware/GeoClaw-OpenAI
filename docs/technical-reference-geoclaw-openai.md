@@ -118,6 +118,10 @@ AI-Agents/
 
 - 将自然语言请求解析为 CLI 参数计划（`NLPlan`）
 - 默认预览，`--execute` 执行
+- 在 `cmd_nl` 增加通用约束保留层：若用户显式给出关键参数，SRE 路由后会二次约束，防止参数丢失或错误改写
+  - `run`：保留 `--city/--bbox/--data-dir/--top-n/--with-maps/...`
+  - `network`：保留 `--pfs-csv/--out-dir/...`
+  - `operator`：保留 `--algorithm` 与 `--param/--param-json` 参数列表
 
 ### 4.8 network：TrackIntel 轨迹网络
 
@@ -183,9 +187,19 @@ geoclaw-openai update --check-only
   - 固定校验输出包含：
     - `data/outputs/reasoning/day_run_reasoning.md`
     - `data/outputs/reasoning/day_run_nl_e2e_report.md`
+- 复杂自然语言端到端回归：`bash scripts/e2e_complex_nl_suite.sh`
+  - 场景 A：商场选址 top-n + SRE 报告
+  - 场景 B：本地 data-dir 区位分析 + SRE 报告
+  - 场景 C：轨迹 network 指定 out-dir + SRE 报告
+  - 场景 D：operator 缓冲分析参数保留验证
 - 轨迹 demo：`bash scripts/run_trackintel_network_demo.sh`
 
-## 8. TODO（技术路线）
+## 8. 数据目录跟踪策略
+
+- `data/` 不再被 `.gitignore` 忽略，便于新用户直接获取学习样例与复现实验资产。
+- 推荐示例入口：`data/examples/`，其中包含轨迹与选址端到端教学样例。
+
+## 9. TODO（技术路线）
 
 - TODO: 将 memory 向量检索升级为可选 embedding 后端。
 - TODO: 为 NL 增加更强参数抽取与冲突消解。

@@ -158,6 +158,18 @@ bash scripts/day_run.sh
 - `data/outputs/reasoning/day_run_reasoning.md`
 - `data/outputs/reasoning/day_run_nl_e2e_report.md`
 
+### 6.6 复杂 NL 端到端套件
+
+```bash
+bash scripts/e2e_complex_nl_suite.sh
+```
+
+覆盖 4 组复杂场景：
+- 商场选址 Top-N + SRE 报告
+- 本地数据目录区位分析 + SRE 报告
+- 轨迹网络分析（显式 out-dir 保留）+ SRE 报告
+- Operator 参数列表保留与执行验证
+
 ## 7. 配置与环境变量
 
 推荐统一变量：

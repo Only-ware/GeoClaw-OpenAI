@@ -1,5 +1,27 @@
 # GeoClaw-OpenAI Release Notes
 
+## v3.0.0-maintenance (2026-03-08)
+
+主要迭代：
+
+1. NL 路由通用性修复
+   - `run` 意图的 SRE 路由兼容策略收紧为 `run/skill`，阻断误改写到 `operator/network`。
+   - 新增 NL 显式参数保留层，SRE 路由后强制保留用户明确输入：
+     - `run`：`city/bbox/data-dir/top-n/with-maps/...`
+     - `network`：`pfs-csv/out-dir/...`
+     - `operator`：`algorithm + param/param-json` 列表
+
+2. data 目录跟踪策略调整
+   - `.gitignore` 取消对 `data/` 的忽略，便于新用户直接获取学习样例与可复现实验资产。
+
+3. 复杂自然语言端到端测试套件
+   - 新增：`scripts/e2e_complex_nl_suite.sh`
+   - 覆盖 4 组复杂场景（商场选址、本地目录区位、轨迹 network、operator）。
+
+4. 文档更新
+   - README、技术参考、开发指南、新手教程同步更新。
+   - 工程说明书 `GeoClaw-OpenAI_工程说明书.docx/.pdf` 重新生成。
+
 ## v3.0.0 (2026-03-08)
 
 主要迭代：

@@ -73,7 +73,10 @@ sections: list[tuple[str, list[str]]] = [
             "5.1 Milestone A-F 收口：SRE 配置化、路由安全、高级推理、外部 reasoner 校验重试完成。",
             "5.2 day-run 扩展为 11 步回归矩阵，覆盖 run/skill/reasoning/nl(use-sre)/memory。",
             "5.3 新增 NL 端到端报告输出参数：--sre-report-out / --sre-print-report。",
-            "5.4 版本与文档体系升级到 v3.0.0。",
+            "5.4 新增复杂 NL 端到端回归套件：scripts/e2e_complex_nl_suite.sh（4 场景）。",
+            "5.5 NL 通用参数保留机制：run/network/operator 显式参数在 SRE 路由后仍被保留。",
+            "5.6 data 目录不再忽略，支持新用户直接复现实验样例。",
+            "5.7 版本与文档体系升级到 v3.0.0。",
         ],
     ),
     (
@@ -87,6 +90,7 @@ sections: list[tuple[str, list[str]]] = [
             "6.6 Skill 安全评估：geoclaw-openai skill-registry assess --spec-file <skill.json>。",
             "6.7 通过评估后注册：geoclaw-openai skill-registry register --spec-file <skill.json> --confirm。",
             "6.8 回归测试：python3 -m unittest discover -s src/geoclaw_qgis/tests。",
+            "6.9 复杂端到端测试：bash scripts/e2e_complex_nl_suite.sh。",
         ],
     ),
     (
@@ -114,7 +118,7 @@ sections: list[tuple[str, list[str]]] = [
         [
             f"文档生成日期：{TODAY}",
             f"当前版本：v{VERSION}",
-            "测试状态：单元测试与 day-run 全链路回归通过。",
+            "测试状态：单元测试、day-run、复杂 NL 端到端回归通过。",
             "维护建议：发布前同步检查 README、CHANGELOG、release-notes、工程说明书。",
         ],
     ),
