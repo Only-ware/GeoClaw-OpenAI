@@ -300,6 +300,13 @@ Profile layers：
 - 版本记录：`docs/release-notes.md`
 - Changelog：`CHANGELOG.md`
 
-## 13. License
+## 13. 验证状态（2026-03-08）
+
+当前版本 `v2.4.0` 已通过本地回归：
+
+- 单元测试：`python3 -m unittest discover -s src/geoclaw_qgis/tests`（23/23 通过）
+- 全链路日常回归：`bash scripts/day_run.sh`（success）
+
+## 14. License
 
 详见 `LICENSE`。

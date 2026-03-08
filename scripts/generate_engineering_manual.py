@@ -112,6 +112,7 @@ sections: list[tuple[str, list[str]]] = [
         [
             f"文档生成日期：{TODAY}",
             f"当前版本：v{VERSION}",
+            "测试状态：单元测试与 day-run 全链路回归通过。",
             "维护建议：发布前同步检查 README、CHANGELOG、release-notes、工程说明书。",
         ],
     ),
