@@ -19,7 +19,7 @@ PDF_OUTPUT = ROOT / "GeoClaw-OpenAI_工程说明书.pdf"
 
 TITLE = "GeoClaw-OpenAI 工程说明书"
 SUBTITLE = "UrbanComp Lab @ China University of Geosciences (Wuhan)"
-VERSION = "2.3.4"
+VERSION = "2.4.0"
 TODAY = dt.date.today().isoformat()
 
 sections: list[tuple[str, list[str]]] = [
@@ -28,7 +28,7 @@ sections: list[tuple[str, list[str]]] = [
         [
             "GeoClaw-OpenAI 面向科研、教学与工程团队，提供可复现的 GIS+AI 全流程能力。",
             "项目目标是将数据获取、空间分析、制图表达、AI 解释、Skill 扩展与任务记忆闭环统一到单一 CLI。",
-            "v2.3.4 重点增强了商场选址 Skill 案例、安全门禁与 Skill 编写规范，提升可维护性与团队协作安全性。",
+            "v2.4.0 重点引入 Soul/User 双层个性化机制，增强系统边界约束与用户长期偏好驱动能力。",
         ],
     ),
     (
@@ -48,7 +48,8 @@ sections: list[tuple[str, list[str]]] = [
             "- docs/: 技术参考、学习手册、release notes、skill 规范文档。",
             "- pipelines/: 原生分析流程与教学案例流程。",
             "- scripts/: 安装、回归、demo、工程文档生成脚本。",
-            "- src/geoclaw_qgis/: CLI、analysis、providers、skills、memory、security。",
+            "- src/geoclaw_qgis/: CLI、analysis、providers、skills、memory、profile、security。",
+            "- soul.md / user.md: 系统层与用户层长期配置文档。",
         ],
     ),
     (
@@ -59,18 +60,19 @@ sections: list[tuple[str, list[str]]] = [
             "4.3 选址分析：约束筛选 + 综合评分排序，输出 SITE_RANK 与 SITE_CLASS。",
             "4.4 栅格/矢量分析：基于 QGIS Processing 算子与 pipeline 参数化运行。",
             "4.5 自然语言入口：NL 解析为 CLI 执行计划，可预览或直接执行。",
-            "4.6 Skill 扩展：支持 LLM 技能与 QGIS 技能双路径，并提供注册前安全评估。",
-            "4.7 Memory 体系：短期记录、长期复盘、归档与向量检索，支持任务经验复用。",
-            "4.8 轨迹网络：融合 Track-Intel 思路，输出 OD 边、节点、行程与网络摘要。",
+            "4.6 Soul/User 分层：soul.md 定义系统边界，user.md 定义用户长期偏好，统一解析后供 planner/router/report/memory 复用。",
+            "4.7 Skill 扩展：支持 LLM 技能与 QGIS 技能双路径，并提供注册前安全评估。",
+            "4.8 Memory 体系：短期记录、长期复盘、归档与向量检索，支持任务经验复用。",
+            "4.9 轨迹网络：融合 Track-Intel 思路，输出 OD 边、节点、行程与网络摘要。",
         ],
     ),
     (
-        "5. 2.3.4 版本新增重点",
+        "5. 2.4.0 版本新增重点",
         [
-            "5.1 新增商场选址 Skill 双写法案例：mall_site_selection_llm 与 mall_site_selection_qgis。",
-            "5.2 新增 Skill 安全门禁：skill-registry assess/register，high 风险默认阻断。",
-            "5.3 新增 Skill 编写规范文档，明确字段要求、行为边界、评审清单与测试要求。",
-            "5.4 README 与文档同步补充简要命令示例，便于新成员快速上手。",
+            "5.1 新增 soul.md + user.md 双层长期配置，并自动在会话初始化加载。",
+            "5.2 planner/tool-router/report/memory 四模块接入结构化 profile 对象。",
+            "5.3 新增 profile CLI：profile init/show，便于用户配置与排障。",
+            "5.4 文档与工程说明书同步升级到 v2.4.0。",
         ],
     ),
     (
@@ -78,10 +80,11 @@ sections: list[tuple[str, list[str]]] = [
         [
             "6.1 环境检查：bash scripts/check_local_env.sh。",
             "6.2 安装与初始化：bash scripts/install_geoclaw_openai.sh && geoclaw-openai onboard。",
-            "6.3 标准分析：geoclaw-openai run --case native_cases --city \"武汉市\"。",
-            "6.4 Skill 安全评估：geoclaw-openai skill-registry assess --spec-file <skill.json>。",
-            "6.5 通过评估后注册：geoclaw-openai skill-registry register --spec-file <skill.json> --confirm。",
-            "6.6 回归测试：python3 -m unittest discover -s src/geoclaw_qgis/tests。",
+            "6.3 初始化 profile：geoclaw-openai profile init && geoclaw-openai profile show。",
+            "6.4 标准分析：geoclaw-openai run --case native_cases --city \"武汉市\"。",
+            "6.5 Skill 安全评估：geoclaw-openai skill-registry assess --spec-file <skill.json>。",
+            "6.6 通过评估后注册：geoclaw-openai skill-registry register --spec-file <skill.json> --confirm。",
+            "6.7 回归测试：python3 -m unittest discover -s src/geoclaw_qgis/tests。",
         ],
     ),
     (

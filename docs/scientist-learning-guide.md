@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 科研学习手册（v2.3.4）
+# GeoClaw-OpenAI 科研学习手册（v2.4.0）
 
 适用对象：科研人员、研究生、GIS 初学者  
 项目归属：UrbanComp Lab @ China University of Geosciences (Wuhan)
@@ -17,11 +17,22 @@
 bash scripts/install_geoclaw_openai.sh
 geoclaw-openai onboard
 source ~/.geoclaw-openai/env.sh
+geoclaw-openai profile init
 
 geoclaw-openai run --case native_cases --city "武汉市"
 ```
 
 默认输出在 `data/outputs/` 下。
+
+## 2.1 Soul/User 个性化层
+
+```bash
+geoclaw-openai profile show
+```
+
+- `soul.md`：系统级原则与执行边界（如不覆盖输入、优先可复现流程）。
+- `user.md`：用户长期偏好（语言风格、工具偏好、输出习惯）。
+- 两者在会话初始化自动加载，并影响 NL 规划、路由、报告与复盘建议。
 
 ## 3. 三种输入方式（互斥）
 

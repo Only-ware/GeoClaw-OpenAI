@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 开发指南（v2.3.4）
+# GeoClaw-OpenAI 开发指南（v2.4.0）
 
 本文档用于后续开发与维护，重点说明工程结构、核心机制、扩展入口与本地验证流程。
 
@@ -24,6 +24,8 @@ AI-Agents/
 │   ├── thematic_maps.yaml
 │   └── examples/
 ├── docs/
+├── soul.md
+├── user.md
 ├── pipelines/
 │   ├── cases/
 │   │   ├── location_analysis.yaml
@@ -43,6 +45,7 @@ AI-Agents/
 │   ├── analysis/
 │   ├── memory/
 │   ├── nl/
+│   ├── profile/
 │   ├── security/
 │   └── providers/
 └── data/
@@ -54,8 +57,11 @@ AI-Agents/
 ## 3. 关键模块职责
 
 - `cli/main.py`
-  - 命令入口：`onboard/config/env/update/run/operator/network/skill/memory/nl`
+  - 命令入口：`onboard/config/env/update/run/operator/network/skill/profile/memory/nl`
   - 除 `memory` 命令外，自动记录短期 memory 并自动复盘到长期 memory
+- `src/geoclaw_qgis/profile/layers.py`
+  - 解析 `soul.md`（系统行为边界）与 `user.md`（长期用户偏好）
+  - 会话初始化加载，提供 planner/tool-router/report/memory 的统一上下文
 - `scripts/geoclaw_case_runner.py`
   - 原生案例统一入口（city/bbox/data-dir）
   - 输出目录强制固定在 `data/outputs`
@@ -97,6 +103,8 @@ bash scripts/install_geoclaw_openai.sh
 # 3) 初始化
 geoclaw-openai onboard
 source ~/.geoclaw-openai/env.sh
+geoclaw-openai profile init
+geoclaw-openai profile show
 ```
 
 ## 6. 开发与验证流程
@@ -146,6 +154,7 @@ bash scripts/day_run.sh
 - `GEOCLAW_AI_MAX_CONTEXT_CHARS`
 
 兼容变量：`GEOCLAW_OPENAI_*`、`GEOCLAW_QWEN_*`、`GEOCLAW_GEMINI_*`。
+Profile 变量：`GEOCLAW_SOUL_PATH`、`GEOCLAW_USER_PATH`。
 
 ## 8. 安全策略
 

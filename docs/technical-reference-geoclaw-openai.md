@@ -1,6 +1,6 @@
-# GeoClaw-OpenAI 技术参考（科研与团队版，v2.3.4）
+# GeoClaw-OpenAI 技术参考（科研与团队版，v2.4.0）
 
-更新时间：2026-03-07（Asia/Shanghai）  
+更新时间：2026-03-08（Asia/Shanghai）  
 机构：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
 ## 1. 技术定位
@@ -11,6 +11,7 @@
 - 栅格/矢量 pipeline 执行与单算法灵活参数
 - 自然语言到 CLI 的计划解析
 - Skill 扩展（pipeline/ai）
+- Soul/User 个性化分层（系统边界 + 用户长期偏好）
 - Memory 闭环（短期、长期、归档、检索）
 - TrackIntel 轨迹网络分析
 
@@ -26,6 +27,8 @@ AI-Agents/
 ├── docs/
 ├── pipelines/
 ├── scripts/
+├── soul.md
+├── user.md
 └── src/geoclaw_qgis/
     ├── ai/
     ├── analysis/
@@ -33,6 +36,7 @@ AI-Agents/
     ├── memory/
     ├── nl/
     ├── providers/
+    ├── profile/
     ├── security/
     └── skills/
 ```
@@ -43,6 +47,7 @@ AI-Agents/
 
 - 配置：`onboard`、`config show`、`config set`、`env`
 - 执行：`run`、`operator`、`network`、`skill`
+- profile：`profile init/show`
 - 记忆：`memory status/short/long/review/archive/search`
 - 智能入口：`nl`
 - 更新：`update`
@@ -91,7 +96,15 @@ AI-Agents/
 - 归档：`~/.geoclaw-openai/memory/archive/short/*.json`
 - 检索：`memory search`（哈希向量 + 余弦相似度）
 
-### 4.5 安全策略
+### 4.5 Soul/User 个性化分层
+
+入口：`src/geoclaw_qgis/profile/layers.py`
+
+- `soul.md`：系统身份、地理推理原则、执行边界（系统级高优先级）
+- `user.md`：用户长期画像、偏好、协作习惯（软个性化层）
+- 会话启动自动加载并解析为结构化对象，供 planner/tool-router/report/memory 统一消费
+
+### 4.6 安全策略
 
 入口：`src/geoclaw_qgis/security/output_guard.py`
 
@@ -99,14 +112,14 @@ AI-Agents/
 - 输出不得与输入路径相同
 - 适用于 `run/operator/network` 主链路
 
-### 4.6 NL：自然语言解析
+### 4.7 NL：自然语言解析
 
 入口：`src/geoclaw_qgis/nl/intent.py`
 
 - 将自然语言请求解析为 CLI 参数计划（`NLPlan`）
 - 默认预览，`--execute` 执行
 
-### 4.7 network：TrackIntel 轨迹网络
+### 4.8 network：TrackIntel 轨迹网络
 
 入口：`src/geoclaw_qgis/analysis/network_ops.py`
 
@@ -126,6 +139,8 @@ AI-Agents/
 - `GEOCLAW_AI_MODEL`
 - `GEOCLAW_AI_TIMEOUT`
 - `GEOCLAW_AI_MAX_CONTEXT_CHARS`
+- `GEOCLAW_SOUL_PATH`
+- `GEOCLAW_USER_PATH`
 
 兼容变量：
 
@@ -139,6 +154,8 @@ AI-Agents/
 # 初始化
 geoclaw-openai onboard
 source ~/.geoclaw-openai/env.sh
+geoclaw-openai profile init
+geoclaw-openai profile show
 
 # 区位/选址
 geoclaw-openai run --case native_cases --city "武汉市"

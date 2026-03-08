@@ -18,6 +18,7 @@ if str(SRC) not in sys.path:
 
 from geoclaw_qgis.ai import ExternalAIClient, ExternalAIConfig, compress_context
 from geoclaw_qgis.config import bootstrap_runtime_env
+from geoclaw_qgis.profile import load_session_profile
 from geoclaw_qgis.skills import SkillRegistry
 
 
@@ -91,9 +92,19 @@ def run_ai_skill(skill_id: str, registry: SkillRegistry, ai_text: str, require_a
     if spec.skill_type != "ai":
         raise ValueError(f"skill {skill_id} is not ai type")
 
+    session = load_session_profile(ROOT)
+    routed_system_prompt = (
+        f"{spec.system_prompt}\n\n"
+        "[Profile Guidance]\n"
+        f"- User role: {session.user.role}\n"
+        f"- Preferred language: {session.user.preferred_language}\n"
+        f"- Preferred tone: {session.user.preferred_tone}\n"
+        f"- Soul mission: {session.soul.mission}\n"
+    )
+
     try:
         client = ExternalAIClient(ExternalAIConfig.from_env())
-        reply = client.chat(ai_text, system_prompt=spec.system_prompt)
+        reply = client.chat(ai_text, system_prompt=routed_system_prompt)
         return {
             "skill": spec.skill_id,
             "type": spec.skill_type,
@@ -135,6 +146,7 @@ def summarize_with_ai(skill_id: str, registry: SkillRegistry, extra_prompt: str,
 def main() -> int:
     bootstrap_runtime_env()
     args = parse_args()
+    session = load_session_profile(ROOT)
     registry = SkillRegistry(ROOT / args.registry)
 
     if args.list:
@@ -160,6 +172,9 @@ def main() -> int:
     if args.with_ai and spec.skill_type == "pipeline":
         extra = args.ai_input or read_text(args.ai_input_file)
         result["ai"] = summarize_with_ai(args.skill, registry, extra, args.require_ai)
+
+    result["tool_router_context"] = session.tool_router_context()
+    result["profile_layers"] = {"soul_path": session.soul_path, "user_path": session.user_path}
 
     # TODO: Support command/plugin type skills with sandboxed hook execution.
     print(json.dumps(result, ensure_ascii=False, indent=2))

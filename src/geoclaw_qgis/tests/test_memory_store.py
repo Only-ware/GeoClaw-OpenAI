@@ -19,6 +19,8 @@ class TestMemoryStore(unittest.TestCase):
                 store = TaskMemoryStore()
 
                 task_a = store.start_task("operator", ["--algorithm", "native:buffer"], cwd=tmp)
+                short_a = store.get_short(task_a)
+                self.assertIn("profile_snapshot", short_a)
                 store.finish_task(task_a, 0, error="")
                 store.auto_review_to_long(task_a)
 

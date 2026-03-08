@@ -20,6 +20,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from geoclaw_qgis.config import bootstrap_runtime_env
+from geoclaw_qgis.profile import load_session_profile
 from geoclaw_qgis.project_info import LAB_AFFILIATION, PROJECT_ATTRIBUTION, PROJECT_VERSION
 from geoclaw_qgis.security import fixed_output_root
 
@@ -203,6 +204,7 @@ def export_maps(analysis_dir: Path, tag: str, qgis_python: str) -> None:
 
 def main() -> int:
     bootstrap_runtime_env()
+    session_profile = load_session_profile(ROOT)
     args = parse_args()
     tag = resolve_tag(args)
     raw_dir, chosen_bbox = prepare_raw_data(args, tag)
@@ -236,6 +238,7 @@ def main() -> int:
         "version": PROJECT_VERSION,
         "attribution": PROJECT_ATTRIBUTION,
         "lab_affiliation": LAB_AFFILIATION,
+        "profile_layers": {"soul_path": session_profile.soul_path, "user_path": session_profile.user_path},
         "case": args.case,
         "tag": tag,
         "raw_dir": str(raw_dir),

@@ -2,6 +2,27 @@
 
 All notable changes to this project are documented in this file.
 
+## [2.4.0] - 2026-03-08
+
+### Added
+- Added dual profile layers:
+  - `soul.md` (system identity, geospatial principles, execution boundaries)
+  - `user.md` (user long-term preferences and workflow habits)
+- Added profile loader/parser module `src/geoclaw_qgis/profile/layers.py`.
+- Added CLI commands:
+  - `geoclaw-openai profile init`
+  - `geoclaw-openai profile show`
+- Added tests for profile parsing and NL integration:
+  - `src/geoclaw_qgis/tests/test_profile_layers.py`
+
+### Changed
+- Bumped project/package runtime version to `2.4.0`.
+- Planner now consumes profile context (`parse_nl_query(..., session=...)`).
+- Tool router now consumes profile context in NL execution and skill runner output metadata.
+- Pipeline report generator now writes profile-layer metadata into `pipeline_report.json`.
+- Memory manager now stores `profile_snapshot` and uses profile hints in auto-review outputs.
+- Updated README/docs and regenerated engineering manual docx/pdf for v2.4.0.
+
 ## [2.3.4] - 2026-03-08
 
 ### Added

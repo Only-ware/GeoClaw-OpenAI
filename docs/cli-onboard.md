@@ -1,4 +1,4 @@
-# GeoClaw CLI 安装与 Onboard（v2.3.4）
+# GeoClaw CLI 安装与 Onboard（v2.4.0）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
@@ -22,6 +22,8 @@ source ~/.geoclaw-openai/env.sh
 - `~/.geoclaw-openai/config.json`
 - `~/.geoclaw-openai/.env`
 - `~/.geoclaw-openai/env.sh`
+- `~/.geoclaw-openai/soul.md`
+- `~/.geoclaw-openai/user.md`
 
 ## 3) 非交互初始化
 
@@ -46,6 +48,21 @@ geoclaw-openai onboard --non-interactive \
 ```
 
 可选参数：`--ai-base-url`、`--qgis-process`、`--default-bbox`、`--registry`、`--workspace`。
+
+## 3.1 Profile Layers（Soul/User）
+
+```bash
+# 初始化默认 soul/user
+geoclaw-openai profile init
+
+# 查看当前加载路径与摘要
+geoclaw-openai profile show
+```
+
+说明：
+- `soul.md`：系统层原则和行为边界（高优先级）。
+- `user.md`：用户长期画像与偏好（软个性化层）。
+- 支持环境变量覆盖路径：`GEOCLAW_SOUL_PATH`、`GEOCLAW_USER_PATH`。
 
 ## 4) 后续配置调整（无需重装）
 
@@ -89,6 +106,7 @@ geoclaw-openai operator \
 # 自然语言（默认预览）
 geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
 geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
+geoclaw-openai nl "商场选址分析，优先可复现工作流" --execute
 
 # TrackIntel 轨迹网络
 geoclaw-openai network \

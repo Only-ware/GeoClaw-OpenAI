@@ -1,12 +1,12 @@
-# GeoClaw-OpenAI 全量复盘（截至 v2.3.4）
+# GeoClaw-OpenAI 全量复盘（截至 v2.4.0）
 
-更新时间：2026-03-07（Asia/Shanghai）  
+更新时间：2026-03-08（Asia/Shanghai）  
 项目：GeoClaw-OpenAI  
 机构：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
 ## 1. 复盘目标
 
-本文档总结项目从框架搭建到 v2.3.4 的核心演进、技术决策与当前边界，作为团队后续开发基线。
+本文档总结项目从框架搭建到 v2.4.0 的核心演进、技术决策与当前边界，作为团队后续开发基线。
 
 ## 2. 版本里程碑
 
@@ -22,11 +22,10 @@
 4. `v2.1.0`
 - 融合 TrackIntel 轨迹处理与 OD 网络分析。
 
-5. `v2.3.4`
-- 自动上下文压缩。
-- OpenAI/Qwen/Gemini 多 provider 支持。
-- memory archive + memory search（向量检索）。
-- 输出安全机制（固定输出目录、阻止覆盖输入）。
+5. `v2.4.0`
+- 引入 `soul.md + user.md` 双层个性化架构并完成会话初始化加载。
+- planner/tool-router/report/memory 四模块消费结构化 profile 对象。
+- 新增 `profile init/show` 用户引导命令。
 
 ## 3. 当前能力版图
 
@@ -34,6 +33,7 @@
 - 输入模式：city / bbox / data-dir（互斥）
 - 制图能力：专题图 PNG + QGZ
 - AI 扩展：Skill + 多 provider
+- 个性化层：Soul（系统）+ User（用户）
 - 智能交互：自然语言解析到 CLI
 - 记忆闭环：记录、复盘、归档、检索
 - 轨迹分析：TrackIntel OD 网络
@@ -55,6 +55,8 @@
 
 5. 可选依赖策略
 - TrackIntel 作为可选能力，不阻塞核心 GIS 主链路。
+6. 分层个性化优先级
+- `soul.md` 高优先级约束系统行为，`user.md` 提供软偏好，不覆盖安全边界。
 
 ## 5. 测试与稳定性
 
@@ -80,10 +82,10 @@
 
 ## 8. 结论
 
-GeoClaw-OpenAI 已完成从“原型验证”到“可复现科研工程系统”的转变。v2.3.4 的核心价值在于：
+GeoClaw-OpenAI 已完成从“原型验证”到“可复现科研工程系统”的转变。v2.4.0 的核心价值在于：
 
 - 功能更完整（GIS + AI + Memory + NL + Mobility）
 - 运行更安全（输出隔离）
-- 扩展更灵活（多 provider + Skill）
+- 扩展更灵活（多 provider + Skill + Profile Layers）
 
 该版本可作为团队后续 2.x 迭代的稳定基线。

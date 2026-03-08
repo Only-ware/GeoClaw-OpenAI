@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from geoclaw_qgis.config import geoclaw_home
+from geoclaw_qgis.profile import SessionProfile, load_session_profile
 from .retrieval import best_matches
 
 
@@ -18,11 +19,17 @@ def _utc_now() -> str:
 class TaskMemoryStore:
     """Persist short-term task memory and reviewed long-term memory."""
 
-    def __init__(self) -> None:
+    def __init__(self, session_profile: SessionProfile | None = None) -> None:
         self._root = geoclaw_home() / "memory"
         self._short_dir = self._root / "short"
         self._archive_short_dir = self._root / "archive" / "short"
         self._long_file = self._root / "long_term.jsonl"
+        self._session_profile = session_profile
+        if self._session_profile is None:
+            try:
+                self._session_profile = load_session_profile()
+            except Exception:
+                self._session_profile = None
         self._ensure_paths()
 
     @property
@@ -60,6 +67,7 @@ class TaskMemoryStore:
             "finished_at": "",
             "promoted": False,
             "review": {},
+            "profile_snapshot": self._memory_profile_snapshot(),
         }
         self._write_short(task_id, payload)
         return task_id
@@ -335,6 +343,16 @@ class TaskMemoryStore:
             if error:
                 actions.append(f"Primary error: {error}")
 
+        profile_ctx = self._memory_profile_snapshot()
+        repro = profile_ctx.get("reproducibility_expectations") or []
+        constraints = profile_ctx.get("long_term_constraints") or []
+        if isinstance(repro, list):
+            for item in repro[:2]:
+                lessons.append(f"Profile reproducibility expectation: {item}")
+        if status != "success" and isinstance(constraints, list):
+            for item in constraints[:2]:
+                actions.append(f"Profile long-term constraint reminder: {item}")
+
         return {
             "reviewed_at": _utc_now(),
             "summary": summary,
@@ -359,4 +377,15 @@ class TaskMemoryStore:
             parts.extend(str(x) for x in (review.get("next_actions") or []))
         parts.extend(str(x) for x in (payload.get("lessons") or []))
         parts.extend(str(x) for x in (payload.get("next_actions") or []))
+        snapshot = payload.get("profile_snapshot")
+        if isinstance(snapshot, dict):
+            parts.append(str(snapshot.get("user_role", "")))
+            parts.append(str(snapshot.get("preferred_tone", "")))
+            parts.extend(str(x) for x in (snapshot.get("reproducibility_expectations") or []))
+            parts.extend(str(x) for x in (snapshot.get("truthfulness_rules") or []))
         return "\n".join(x for x in parts if x.strip())
+
+    def _memory_profile_snapshot(self) -> dict[str, Any]:
+        if self._session_profile is None:
+            return {}
+        return self._session_profile.memory_context()

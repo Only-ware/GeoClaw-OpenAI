@@ -18,6 +18,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from geoclaw_qgis.config import bootstrap_runtime_env
+from geoclaw_qgis.profile import load_session_profile
 from geoclaw_qgis.project_info import PROJECT_ATTRIBUTION, PROJECT_VERSION
 from geoclaw_qgis.security import OutputSecurityError, validate_output_targets
 
@@ -287,6 +288,7 @@ def run_step(qgis_bin: str, step: dict[str, Any], context: dict[str, Any], dry_r
 def main() -> int:
     bootstrap_runtime_env()
     args = parse_args()
+    session_profile = load_session_profile(ROOT)
     config_path = Path(args.config).resolve()
     if not config_path.exists():
         raise FileNotFoundError(f"config not found: {config_path}")
@@ -328,6 +330,13 @@ def main() -> int:
         "config": str(config_path),
         "qgis_process": qgis_bin,
         "variables": variables,
+        "agent_layers": {
+            "soul_path": session_profile.soul_path,
+            "user_path": session_profile.user_path,
+            "mission": session_profile.soul.mission,
+            "execution_hierarchy": session_profile.soul.execution_hierarchy,
+            "report_requirements": session_profile.report_context(),
+        },
         "steps": {},
     }
 

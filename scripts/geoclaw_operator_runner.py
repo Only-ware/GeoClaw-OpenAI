@@ -16,6 +16,7 @@ if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
 from geoclaw_qgis.config import bootstrap_runtime_env, detect_qgis_process
+from geoclaw_qgis.profile import load_session_profile
 from geoclaw_qgis.project_info import LAB_AFFILIATION, PROJECT_ATTRIBUTION, PROJECT_VERSION
 from geoclaw_qgis.providers import QgisProcessRunner
 from geoclaw_qgis.security import OutputSecurityError, validate_output_targets
@@ -112,6 +113,7 @@ def prepare_output_targets(params: dict[str, Any], overwrite: bool) -> None:
 
 def main() -> int:
     bootstrap_runtime_env()
+    session_profile = load_session_profile(ROOT)
     args = parse_args()
 
     file_params = load_params_file(args.params_file)
@@ -135,7 +137,18 @@ def main() -> int:
     encoded = [f"{k}={runner.encode_value(v)}" for k, v in params.items()]
     dry_cmd = [qgis_process, "--json", "run", args.algorithm, "--"] + encoded
     if args.dry_run:
-        print(json.dumps({"command": dry_cmd, "algorithm": args.algorithm, "params": params}, ensure_ascii=False, indent=2))
+        print(
+            json.dumps(
+                {
+                    "command": dry_cmd,
+                    "algorithm": args.algorithm,
+                    "params": params,
+                    "profile_layers": {"soul_path": session_profile.soul_path, "user_path": session_profile.user_path},
+                },
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
         return 0
 
     result = runner.run_algorithm(args.algorithm, params=params, step_id=args.step_id)
@@ -149,6 +162,7 @@ def main() -> int:
         "params": params,
         "outputs": result.outputs,
         "message": result.message,
+        "profile_layers": {"soul_path": session_profile.soul_path, "user_path": session_profile.user_path},
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0 if result.success else 1

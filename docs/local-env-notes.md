@@ -1,4 +1,4 @@
-# 本地环境说明（v2.3.4）
+# 本地环境说明（v2.4.0）
 
 检测时间：2026-03-07
 
@@ -19,6 +19,9 @@ bash scripts/check_local_env.sh
 
 # 3) CLI 可用性
 geoclaw-openai --help
+
+# 4) Profile layers 可用性
+geoclaw-openai profile show
 ```
 
 ## 3. provider 与配置检查
@@ -33,6 +36,7 @@ geoclaw-openai config show
 - `ai_base_url` 与 provider 是否匹配
 - `ai_model` 是否存在
 - `qgis_process` 路径是否可执行
+- `soul.md` / `user.md` 路径是否可读
 
 ## 4. 常见排障
 

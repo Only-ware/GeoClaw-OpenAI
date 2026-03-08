@@ -25,6 +25,7 @@ from geoclaw_qgis.config import (
 )
 from geoclaw_qgis.memory import TaskMemoryStore
 from geoclaw_qgis.nl import NLPlan, parse_nl_query
+from geoclaw_qgis.profile import SessionProfile, ensure_profile_layers, load_session_profile
 from geoclaw_qgis.project_info import LAB_AFFILIATION, PROJECT_NAME, PROJECT_VERSION
 from geoclaw_qgis.security import OutputSecurityError, fixed_output_root, validate_output_targets
 from geoclaw_qgis.skills import assess_skill_spec, load_skill_spec_file, upsert_skill_registry
@@ -47,6 +48,7 @@ AI_PROVIDER_PRESETS: dict[str, dict[str, str]] = {
         "model": "gemini-flash-latest",
     },
 }
+_SESSION_PROFILE: SessionProfile | None = None
 
 
 def ask_value(prompt: str, default: str = "") -> str:
@@ -183,6 +185,7 @@ def cmd_onboard(args: argparse.Namespace) -> int:
     config_file = write_config(payload)
     env_file = write_env(env_values)
     env_sh = write_env_sh(env_values)
+    profile_paths = ensure_profile_layers(Path(workspace).expanduser().resolve())
 
     print(json.dumps({
         "config": str(config_file),
@@ -190,6 +193,10 @@ def cmd_onboard(args: argparse.Namespace) -> int:
         "env_sh": str(env_sh),
         "qgis_process": detected_qgis,
         "registry": registry_path,
+        "profile_layers": {
+            "home_soul": profile_paths["home_soul"],
+            "home_user": profile_paths["home_user"],
+        },
     }, ensure_ascii=False, indent=2))
 
     print("\nNext:")
@@ -326,6 +333,27 @@ def cmd_env(_args: argparse.Namespace) -> int:
         print(f"env script not found: {path}")
         return 1
     print(f"source {path}")
+    return 0
+
+
+def get_session_profile(*, force_reload: bool = False) -> SessionProfile:
+    global _SESSION_PROFILE
+    if _SESSION_PROFILE is None or force_reload:
+        _SESSION_PROFILE = load_session_profile(resolve_workspace_root(), force_reload=force_reload)
+    return _SESSION_PROFILE
+
+
+def cmd_profile_init(_args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    payload = ensure_profile_layers(resolve_workspace_root())
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_profile_show(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    session = get_session_profile(force_reload=bool(args.reload))
+    print(json.dumps(session.to_dict(), ensure_ascii=False, indent=2))
     return 0
 
 
@@ -467,7 +495,7 @@ def cmd_update(args: argparse.Namespace) -> int:
 
 def cmd_memory_status(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
-    store = TaskMemoryStore()
+    store = TaskMemoryStore(session_profile=get_session_profile())
     payload = {
         "memory_root": str(store.short_dir.parent),
         "short_count": store.count_short(),
@@ -483,7 +511,7 @@ def cmd_memory_status(args: argparse.Namespace) -> int:
 
 def cmd_memory_short(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
-    store = TaskMemoryStore()
+    store = TaskMemoryStore(session_profile=get_session_profile())
     rows = store.list_short(limit=args.limit, status=args.status)
     print(json.dumps({"items": rows, "count": len(rows)}, ensure_ascii=False, indent=2))
     return 0
@@ -491,7 +519,7 @@ def cmd_memory_short(args: argparse.Namespace) -> int:
 
 def cmd_memory_long(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
-    store = TaskMemoryStore()
+    store = TaskMemoryStore(session_profile=get_session_profile())
     rows = store.list_long(limit=args.limit)
     print(json.dumps({"items": rows, "count": len(rows)}, ensure_ascii=False, indent=2))
     return 0
@@ -499,7 +527,7 @@ def cmd_memory_long(args: argparse.Namespace) -> int:
 
 def cmd_memory_review(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
-    store = TaskMemoryStore()
+    store = TaskMemoryStore(session_profile=get_session_profile())
     payload = store.review_task_to_long(
         args.task_id,
         summary=args.summary or "",
@@ -512,7 +540,7 @@ def cmd_memory_review(args: argparse.Namespace) -> int:
 
 def cmd_memory_archive(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
-    store = TaskMemoryStore()
+    store = TaskMemoryStore(session_profile=get_session_profile())
     payload = store.archive_short(
         before_days=args.before_days,
         status=args.status,
@@ -526,7 +554,7 @@ def cmd_memory_search(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
     if not args.query.strip():
         raise ValueError("--query is required")
-    store = TaskMemoryStore()
+    store = TaskMemoryStore(session_profile=get_session_profile())
     rows = store.search_memory(
         query=args.query,
         scope=args.scope,
@@ -543,14 +571,32 @@ def cmd_nl(args: argparse.Namespace) -> int:
     if not query_text:
         raise ValueError("query text is required")
 
-    plan: NLPlan = parse_nl_query(query_text)
+    session = get_session_profile()
+    plan: NLPlan = parse_nl_query(query_text, session=session)
+    routed_cli_args = list(plan.cli_args)
+    route_notes: list[str] = []
+    query_lower = query_text.lower()
+    if plan.intent in {"run", "operator"} and any(k in query_lower for k in ("mall", "shopping", "商场")):
+        preferred = "mall_site_selection_qgis"
+        if any(k in query_lower for k in ("llm", "ai", "大模型")):
+            preferred = "mall_site_selection_llm"
+        routed_cli_args = ["skill", "--", "--skill", preferred]
+        if preferred == "mall_site_selection_qgis":
+            routed_cli_args.append("--skip-download")
+        route_notes.append(f"Tool router prioritized registered skill={preferred} by soul execution hierarchy.")
+
     payload = {
         "query": plan.query,
         "intent": plan.intent,
         "confidence": plan.confidence,
         "reasons": plan.reasons,
-        "command_preview": "geoclaw-openai " + " ".join(plan.cli_args),
-        "cli_args": plan.cli_args,
+        "command_preview": "geoclaw-openai " + " ".join(routed_cli_args),
+        "cli_args": routed_cli_args,
+        "tool_route_notes": route_notes,
+        "profile_layers": {
+            "soul_path": session.soul_path,
+            "user_path": session.user_path,
+        },
         "execute": bool(args.execute),
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
@@ -561,9 +607,9 @@ def cmd_nl(args: argparse.Namespace) -> int:
 
     current_cli = Path(sys.argv[0]).expanduser()
     if current_cli.exists() and current_cli.is_file() and "geoclaw-openai" in current_cli.name:
-        cmd = [str(current_cli), *plan.cli_args]
+        cmd = [str(current_cli), *routed_cli_args]
     else:
-        cmd = [os.environ.get("PYTHON", "python3"), "-m", "geoclaw_qgis.cli.main", *plan.cli_args]
+        cmd = [os.environ.get("PYTHON", "python3"), "-m", "geoclaw_qgis.cli.main", *routed_cli_args]
     proc = subprocess.run(cmd, check=False)
     return int(proc.returncode)
 
@@ -835,6 +881,14 @@ def build_parser() -> argparse.ArgumentParser:
     update.add_argument("--skip-install", action="store_true", help="skip pip editable reinstall after pull")
     update.set_defaults(func=cmd_update)
 
+    profile = sub.add_parser("profile", help="manage soul/user profile layers")
+    profile_sub = profile.add_subparsers(dest="profile_cmd", required=True)
+    profile_init = profile_sub.add_parser("init", help="initialize default soul.md and user.md")
+    profile_init.set_defaults(func=cmd_profile_init)
+    profile_show = profile_sub.add_parser("show", help="show loaded profile layers")
+    profile_show.add_argument("--reload", action="store_true", help="force reload from files")
+    profile_show.set_defaults(func=cmd_profile_show)
+
     skill = sub.add_parser("skill", help="proxy to scripts/geoclaw_skill_runner.py")
     skill.add_argument("extra", nargs=argparse.REMAINDER, help="args passed to skill runner")
     skill.set_defaults(func=cmd_skill)
@@ -975,11 +1029,16 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     raw_argv = list(argv) if argv is not None else sys.argv[1:]
+    bootstrap_runtime_env()
+    try:
+        get_session_profile()
+    except Exception as exc:
+        print(f"[PROFILE][WARN] failed to load soul/user profile layers: {exc}", file=sys.stderr)
 
     if getattr(args, "command", "") == "memory":
         return int(args.func(args))
 
-    store = TaskMemoryStore()
+    store = TaskMemoryStore(session_profile=get_session_profile())
     task_id = store.start_task(
         command=str(getattr(args, "command", "unknown")),
         argv=raw_argv,

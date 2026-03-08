@@ -3,6 +3,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 
+from geoclaw_qgis.profile import SessionProfile
+
 
 BBOX_RE = re.compile(
     r"(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)"
@@ -33,6 +35,16 @@ class NLPlan:
 
 def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
     return any(t in text for t in terms)
+
+
+def _append_profile_reasons(reasons: list[str], session: SessionProfile | None) -> None:
+    if session is None:
+        return
+    lang = session.user.preferred_language.strip()
+    if lang:
+        reasons.append(f"User preferred language={lang}.")
+    if session.soul.execution_hierarchy:
+        reasons.append(f"Execution hierarchy priority={session.soul.execution_hierarchy[0]}.")
 
 
 def _detect_bbox(text: str) -> str:
@@ -109,8 +121,9 @@ def _detect_case(text: str, text_lower: str) -> str:
     return "native_cases"
 
 
-def _build_update_plan(query: str, text_lower: str) -> NLPlan:
+def _build_update_plan(query: str, text_lower: str, session: SessionProfile | None = None) -> NLPlan:
     reasons = ["Detected update-related keywords."]
+    _append_profile_reasons(reasons, session)
     cli_args = ["update"]
     if _contains_any(text_lower, ("检查", "check", "是否有更新", "有没有更新", "只检查", "仅检查")):
         cli_args.append("--check-only")
@@ -118,8 +131,9 @@ def _build_update_plan(query: str, text_lower: str) -> NLPlan:
     return NLPlan(query=query, intent="update", confidence=0.97, reasons=reasons, cli_args=cli_args)
 
 
-def _build_memory_plan(query: str, text: str, text_lower: str) -> NLPlan:
+def _build_memory_plan(query: str, text: str, text_lower: str, session: SessionProfile | None = None) -> NLPlan:
     reasons = ["Detected memory-related keywords."]
+    _append_profile_reasons(reasons, session)
     if _contains_any(text_lower, ("long", "长期")):
         cli_args = ["memory", "long"]
         reasons.append("Targeting long-term memory.")
@@ -132,8 +146,9 @@ def _build_memory_plan(query: str, text: str, text_lower: str) -> NLPlan:
     return NLPlan(query=query, intent="memory", confidence=0.95, reasons=reasons, cli_args=cli_args)
 
 
-def _build_skill_plan(query: str, text: str, text_lower: str) -> NLPlan:
+def _build_skill_plan(query: str, text: str, text_lower: str, session: SessionProfile | None = None) -> NLPlan:
     reasons = ["Detected skill-related keywords."]
+    _append_profile_reasons(reasons, session)
     if _contains_any(text_lower, ("list", "列表", "有哪些")):
         return NLPlan(
             query=query,
@@ -141,6 +156,19 @@ def _build_skill_plan(query: str, text: str, text_lower: str) -> NLPlan:
             confidence=0.93,
             reasons=reasons + ["Listing skills."],
             cli_args=["skill", "--", "--list"],
+        )
+
+    if _contains_any(text_lower, ("mall", "shopping", "商场", "商业综合体")):
+        skill_id = "mall_site_selection_qgis"
+        if _contains_any(text_lower, ("llm", "ai", "大模型")):
+            skill_id = "mall_site_selection_llm"
+        reasons.append(f"Resolved mall skill_id={skill_id}.")
+        return NLPlan(
+            query=query,
+            intent="skill",
+            confidence=0.95,
+            reasons=reasons,
+            cli_args=["skill", "--", "--skill", skill_id],
         )
 
     skill_id = "location_analysis"
@@ -155,8 +183,9 @@ def _build_skill_plan(query: str, text: str, text_lower: str) -> NLPlan:
     return NLPlan(query=query, intent="skill", confidence=0.9, reasons=reasons, cli_args=cli_args)
 
 
-def _build_operator_plan(query: str, text: str, text_lower: str) -> NLPlan:
+def _build_operator_plan(query: str, text: str, text_lower: str, session: SessionProfile | None = None) -> NLPlan:
     reasons = ["Detected operator/single-algorithm keywords."]
+    _append_profile_reasons(reasons, session)
     distance = 800
     dist_m = re.search(r"(\d{2,6})\s*(?:m|米)", text_lower)
     if dist_m:
@@ -200,8 +229,9 @@ def _build_operator_plan(query: str, text: str, text_lower: str) -> NLPlan:
     return NLPlan(query=query, intent="operator", confidence=0.85, reasons=reasons, cli_args=cli_args)
 
 
-def _build_network_plan(query: str, text: str, text_lower: str) -> NLPlan:
+def _build_network_plan(query: str, text: str, text_lower: str, session: SessionProfile | None = None) -> NLPlan:
     reasons = ["Detected complex-network/trackintel keywords."]
+    _append_profile_reasons(reasons, session)
     pfs_path = "data/examples/trajectory/trackintel_demo_pfs.csv"
     out_dir = "data/outputs/network_trackintel_nl"
     paths = PATH_HINT_RE.findall(text)
@@ -224,10 +254,11 @@ def _build_network_plan(query: str, text: str, text_lower: str) -> NLPlan:
     return NLPlan(query=query, intent="network", confidence=0.86, reasons=reasons, cli_args=cli_args)
 
 
-def _build_run_plan(query: str, text: str, text_lower: str) -> NLPlan:
+def _build_run_plan(query: str, text: str, text_lower: str, session: SessionProfile | None = None) -> NLPlan:
     case = _detect_case(text, text_lower)
     cli_args = ["run", "--case", case]
     reasons = [f"Resolved case={case}."]
+    _append_profile_reasons(reasons, session)
 
     data_dir = _detect_data_dir(text)
     bbox = _detect_bbox(text)
@@ -242,6 +273,10 @@ def _build_run_plan(query: str, text: str, text_lower: str) -> NLPlan:
     elif city:
         cli_args.extend(["--city", city])
         reasons.append(f"Resolved city={city}.")
+    elif session is not None and case in {"site_selection", "location_analysis", "native_cases"}:
+        if _contains_any(" ".join(session.user.common_project_contexts).lower(), ("urban", "site", "location", "城市", "选址")):
+            cli_args.extend(["--city", "武汉市"])
+            reasons.append("No explicit source found; used profile default city=武汉市.")
     else:
         reasons.append("No explicit input source found; fallback to default runtime bbox/cached data.")
 
@@ -264,20 +299,20 @@ def _build_run_plan(query: str, text: str, text_lower: str) -> NLPlan:
     return NLPlan(query=query, intent="run", confidence=0.82, reasons=reasons, cli_args=cli_args)
 
 
-def parse_nl_query(query: str) -> NLPlan:
+def parse_nl_query(query: str, session: SessionProfile | None = None) -> NLPlan:
     text = query.strip()
     if not text:
         raise ValueError("empty natural-language query")
     text_lower = text.lower()
 
     if _contains_any(text_lower, ("update", "升级", "更新", "拉取最新", "最新版本")):
-        return _build_update_plan(text, text_lower)
+        return _build_update_plan(text, text_lower, session)
     if _contains_any(text_lower, ("memory", "记忆", "复盘", "短期", "长期", "任务记录")):
-        return _build_memory_plan(text, text, text_lower)
+        return _build_memory_plan(text, text, text_lower, session)
     if _contains_any(text_lower, ("skill", "技能")):
-        return _build_skill_plan(text, text, text_lower)
+        return _build_skill_plan(text, text, text_lower, session)
     if _contains_any(text_lower, ("复杂网络", "network", "od", "trackintel", "流动网络")):
-        return _build_network_plan(text, text, text_lower)
+        return _build_network_plan(text, text, text_lower, session)
     if _contains_any(text_lower, ("operator", "算子", "buffer", "缓冲", "单算法")):
-        return _build_operator_plan(text, text, text_lower)
-    return _build_run_plan(text, text, text_lower)
+        return _build_operator_plan(text, text, text_lower, session)
+    return _build_run_plan(text, text, text_lower, session)

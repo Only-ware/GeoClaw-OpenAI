@@ -1,33 +1,46 @@
-# GeoClaw-OpenAI (v2.3.4)
+# GeoClaw-OpenAI (v2.4.0)
 
 GeoClaw-OpenAI 是一个基于 `QGIS Processing (qgis_process)` 的空间分析与制图工具链，面向科研和工程团队，支持从数据获取、分析建模、结果制图到 AI 解释的完整流程。
 
 机构：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
-## 1. v2.3.4 新增能力（重点）
+## 1. v2.4.0 新增能力（重点）
 
 本次版本重点新增以下能力：
 
-1. 商场选址 Skill 双写法（新增案例）
+1. Soul/User 双层个性化架构（新增）
+- `soul.md`：系统身份、地理推理原则、执行边界（系统级高优先级）。
+- `user.md`：用户长期画像与偏好（个性化软约束，不覆盖安全边界）。
+- 会话初始化自动加载并解析为结构化对象，供 planner/tool-router/report/memory 使用。
+
+2. 新增 profile CLI（新增）
+- `geoclaw-openai profile init`：初始化 `~/.geoclaw-openai/soul.md` 与 `user.md`。
+- `geoclaw-openai profile show`：查看当前加载路径与结构化摘要。
+
+3. 商场选址 Skill 双写法（延续）
 - `mall_site_selection_llm`：大模型策略推理写法。
 - `mall_site_selection_qgis`：QGIS Processing 可复现计算写法。
 
-2. Skill 注册前安全门禁（新增）
+4. Skill 注册前安全门禁（延续）
 - 新增 `skill-registry assess` 与 `skill-registry register`。
 - 注册前自动评估风险等级；`high` 风险默认阻断。
 - 注册动作必须用户确认（`--confirm` 或交互 `YES`）。
 
-3. Skill 编写规范文档（新增）
+5. Skill 编写规范文档（延续）
 - 新增 Skill 编写规范与评审清单。
 - 新增安全门禁说明与高危样例。
 
-4. 模型与运行链路同步
+6. 模型与运行链路同步
 - 默认模型保持最新族：`gpt-5-mini`、`qwen-plus-latest`、`gemini-flash-latest`。
 - `day_run`、CLI 默认配置与文档示例一致。
 
 ### 1.1 新增能力简要使用
 
 ```bash
+# 初始化/查看 profile layers
+geoclaw-openai profile init
+geoclaw-openai profile show
+
 # 商场选址：LLM 写法
 geoclaw-openai skill -- --skill mall_site_selection_llm --ai-input "给出武汉商场选址策略"
 
@@ -144,6 +157,7 @@ geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 ```
 
 当前 NL 覆盖：`run` / `operator` / `network` / `skill` / `memory` / `update`。
+在 v2.4.0 中，NL 规划会读取 `soul.md/user.md`，并在商场选址等场景触发注册 Skill 优先路由。
 
 ## 6. Memory：记录、复盘、归档、检索
 
@@ -248,6 +262,7 @@ geoclaw-openai network --help
 geoclaw-openai skill -- --help
 geoclaw-openai memory --help
 geoclaw-openai nl --help
+geoclaw-openai profile --help
 geoclaw-openai update --help
 ```
 
@@ -266,16 +281,21 @@ geoclaw-openai update --help
 - Qwen：`GEOCLAW_QWEN_*`
 - Gemini：`GEOCLAW_GEMINI_*`
 
+Profile layers：
+- `GEOCLAW_SOUL_PATH`：指定 `soul.md` 路径（可选）
+- `GEOCLAW_USER_PATH`：指定 `user.md` 路径（可选）
+
 ## 12. 文档导航
 
 - 技术参考：`docs/technical-reference-geoclaw-openai.md`
-- 全量复盘：`docs/geoclaw-full-retrospective-v2.3.4.md`
+- 全量复盘：`docs/geoclaw-full-retrospective-v2.4.0.md`
 - 开发指南：`docs/development-guide.md`
 - 科研学习手册：`docs/scientist-learning-guide.md`
 - 原生案例与 Skill：`docs/native-cases-and-skills.md`
 - Skill 案例（商场选址双写法）：`docs/skill-case-mall-site-selection.md`
 - Skill 编写规范：`docs/skill-authoring-spec.md`
 - Skill 安全门禁：`docs/skill-security-guard.md`
+- Soul/User 分层说明：`docs/soul-user-profile.md`
 - CLI 安装与初始化：`docs/cli-onboard.md`
 - 版本记录：`docs/release-notes.md`
 - Changelog：`CHANGELOG.md`
