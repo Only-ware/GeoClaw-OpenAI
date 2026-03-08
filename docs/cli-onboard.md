@@ -2,6 +2,10 @@
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
+新手建议先读：
+- `docs/beginner-quickstart.md`（最短路径）
+- `README.md` 的「3. 安装与初始化（新手完整流程）」（含 Windows + QGIS）
+
 ## 1) 安装
 
 ```bash
@@ -9,6 +13,8 @@ bash scripts/install_geoclaw_openai.sh
 ```
 
 安装后可使用命令：`geoclaw-openai`。
+
+若你是 Windows 用户，请优先参考 README 中的 PowerShell 安装段落，并先安装 QGIS。
 
 ## 2) 首次初始化（推荐）
 

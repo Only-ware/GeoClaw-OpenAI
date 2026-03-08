@@ -3,6 +3,10 @@
 适用对象：科研人员、研究生、GIS 初学者  
 项目归属：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
+安装入口导航：
+- 新手优先：`docs/beginner-quickstart.md`
+- 全量安装说明（含 Windows + QGIS）：`README.md` 的「3. 安装与初始化（新手完整流程）」
+
 ## 1. 你可以做什么
 
 - 用城市名、bbox 或本地数据目录快速开展区位/选址分析
@@ -101,6 +105,7 @@ geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 - `openai`
 - `qwen`
 - `gemini`
+- `ollama`（本地模型）
 
 切换示例：
 
@@ -108,6 +113,7 @@ geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 geoclaw-openai config set --ai-provider openai --ai-model gpt-5.4
 geoclaw-openai config set --ai-provider qwen --ai-model qwen3-max
 geoclaw-openai config set --ai-provider gemini --ai-model gemini-3.1-pro-preview
+geoclaw-openai config set --ai-provider ollama --ai-model qwen3.5:0.8b
 ```
 
 模型建议（2026-03-07）：

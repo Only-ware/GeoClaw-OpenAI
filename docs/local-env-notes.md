@@ -1,6 +1,6 @@
 # 本地环境说明（v3.1.0）
 
-检测时间：2026-03-07
+检测时间：2026-03-08
 
 ## 1. 当前结论
 
@@ -32,11 +32,15 @@ geoclaw-openai config show
 
 重点确认：
 
-- `ai_provider` 是否正确（openai/qwen/gemini）
+- `ai_provider` 是否正确（openai/qwen/gemini/ollama）
 - `ai_base_url` 与 provider 是否匹配
 - `ai_model` 是否存在
 - `qgis_process` 路径是否可执行
 - `soul.md` / `user.md` 路径是否可读
+
+新手安装入口：
+- `docs/beginner-quickstart.md`
+- `README.md` 的「3. 安装与初始化（新手完整流程）」
 
 ## 4. 常见排障
 

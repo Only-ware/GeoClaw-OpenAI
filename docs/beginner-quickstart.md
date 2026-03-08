@@ -2,6 +2,10 @@
 
 本文档面向不写 Python 的新手用户，目标是用最少命令完成安装、配置、运行和查看结果。
 
+安装总入口（含 Windows + QGIS）：
+- README 安装章节：`README.md` 的「3. 安装与初始化（新手完整流程）」
+- 详细 Onboard 文档：`docs/cli-onboard.md`
+
 ## 1. 你将得到什么
 
 完成本文后，你可以直接用自然语言执行问题，例如：
@@ -17,7 +21,7 @@
 
 需要具备：
 
-- macOS / Linux（推荐）
+- macOS / Linux / Windows
 - `python3`（建议 3.10+）
 - QGIS（需包含 `qgis_process`）
 
@@ -43,6 +47,17 @@ source ~/.geoclaw-openai/env.sh
 - 默认 bbox
 
 如使用本地模型，推荐选 `ollama`，默认端点为 `http://127.0.0.1:11434/v1`。
+
+### 3.1 Windows 用户（PowerShell + QGIS）
+
+如果你是 Windows 新手，建议直接按 README 的 Windows 流程操作：
+
+1. 安装 QGIS（下载页：<https://qgis.org/download/>）
+2. 在 PowerShell 里确认 `qgis_process.exe` 路径
+3. 执行 `git clone` + `py -3 -m pip install --user -e .`
+4. 执行 `geoclaw-openai onboard --qgis-process "<你的qgis_process路径>"`
+
+可直接参考：`README.md` 的「3.6 Windows（PowerShell）安装流程 + QGIS 安装」。
 
 ## 4. 第一条命令（端到端）
 
