@@ -89,13 +89,11 @@ class TestCLIParser(unittest.TestCase):
 
     def test_apply_sre_execution_plan_route_matrix(self) -> None:
         base = ["run", "--case", "native_cases"]
-        plans = [
+        allowed_plans = [
             ["run", "--case", "site_selection"],
-            ["operator", "--algorithm", "native:buffer"],
-            ["network", "--pfs-csv", "data/examples/trajectory/trackintel_demo_pfs.csv"],
             ["skill", "--", "--skill", "mall_site_selection_qgis"],
         ]
-        for cmd in plans:
+        for cmd in allowed_plans:
             with self.subTest(cmd=cmd):
                 notes: list[str] = []
                 routed, applied = _apply_sre_execution_plan(
@@ -113,6 +111,29 @@ class TestCLIParser(unittest.TestCase):
                 self.assertTrue(applied)
                 self.assertEqual(routed, cmd)
                 self.assertTrue(any("execution plan applied" in x for x in notes))
+
+        blocked_plans = [
+            ["operator", "--algorithm", "native:buffer"],
+            ["network", "--pfs-csv", "data/examples/trajectory/trackintel_demo_pfs.csv"],
+        ]
+        for cmd in blocked_plans:
+            with self.subTest(cmd=cmd):
+                notes = []
+                routed, applied = _apply_sre_execution_plan(
+                    base,
+                    sre_payload={
+                        "execution_plan": {
+                            "safe_to_execute": True,
+                            "route_target": cmd[0],
+                            "command": cmd,
+                        }
+                    },
+                    base_intent="run",
+                    route_notes=notes,
+                )
+                self.assertFalse(applied)
+                self.assertEqual(routed, base)
+                self.assertTrue(any("cross-intent reroute" in x for x in notes))
 
     def test_apply_sre_execution_plan_blocked(self) -> None:
         base = ["run", "--case", "native_cases"]
@@ -206,7 +227,10 @@ class TestCLIParser(unittest.TestCase):
         self.assertTrue(any("remapped run case" in x for x in notes))
 
     def test_route_compatibility_policy(self) -> None:
-        self.assertTrue(_is_sre_route_compatible(base_intent="run", new_root="network"))
+        self.assertTrue(_is_sre_route_compatible(base_intent="run", new_root="run"))
+        self.assertTrue(_is_sre_route_compatible(base_intent="run", new_root="skill"))
+        self.assertFalse(_is_sre_route_compatible(base_intent="run", new_root="network"))
+        self.assertFalse(_is_sre_route_compatible(base_intent="run", new_root="operator"))
         self.assertTrue(_is_sre_route_compatible(base_intent="operator", new_root="operator"))
         self.assertFalse(_is_sre_route_compatible(base_intent="operator", new_root="run"))
         self.assertFalse(_is_sre_route_compatible(base_intent="network", new_root="run"))

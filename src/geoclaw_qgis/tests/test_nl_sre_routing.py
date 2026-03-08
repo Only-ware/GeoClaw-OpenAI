@@ -94,6 +94,45 @@ class TestNLSRERouting(unittest.TestCase):
     @patch("geoclaw_qgis.cli.main.bootstrap_runtime_env")
     @patch("geoclaw_qgis.cli.main.get_session_profile")
     @patch("geoclaw_qgis.cli.main.parse_nl_query")
+    def test_mall_route_preserves_top_n_for_skill_pipeline(
+        self,
+        mock_parse: Mock,
+        mock_session: Mock,
+        _mock_bootstrap: Mock,
+    ) -> None:
+        mock_parse.return_value = NLPlan(
+            query="武汉最适合建商场的前5个地点",
+            intent="run",
+            confidence=0.92,
+            reasons=["run"],
+            cli_args=["run", "--case", "site_selection", "--city", "武汉市", "--top-n", "5"],
+        )
+        mock_session.return_value = type("S", (), {"soul_path": "soul.md", "user_path": "user.md"})()
+
+        args = argparse.Namespace(
+            query=["武汉最适合建商场的前5个地点"],
+            use_sre=False,
+            sre_strict=False,
+            sre_data_dir="",
+            sre_datasets_file="",
+            execute=False,
+        )
+        with io.StringIO() as buf, redirect_stdout(buf):
+            rc = cmd_nl(args)
+            out = buf.getvalue()
+
+        self.assertEqual(rc, 0)
+        payload = _extract_payload(out)
+        self.assertEqual(
+            payload["cli_args"],
+            ["skill", "--", "--skill", "mall_site_selection_qgis", "--set", "top_n=5"],
+        )
+        self.assertNotIn("--skip-download", payload["cli_args"])
+        self.assertTrue(any("Preserved NL top-n" in x for x in payload["tool_route_notes"]))
+
+    @patch("geoclaw_qgis.cli.main.bootstrap_runtime_env")
+    @patch("geoclaw_qgis.cli.main.get_session_profile")
+    @patch("geoclaw_qgis.cli.main.parse_nl_query")
     @patch("geoclaw_qgis.cli.main.run_spatial_reasoning")
     @patch("geoclaw_qgis.cli.main.build_reasoning_input_from_profile")
     @patch("geoclaw_qgis.cli.main._collect_reasoning_datasets")
@@ -202,6 +241,128 @@ class TestNLSRERouting(unittest.TestCase):
         self.assertEqual(payload["intent"], "network")
         self.assertEqual(payload["cli_args"], ["network", "--pfs-csv", "y.csv"])
         self.assertTrue(any("execution plan applied" in x for x in payload["tool_route_notes"]))
+
+    @patch("geoclaw_qgis.cli.main.bootstrap_runtime_env")
+    @patch("geoclaw_qgis.cli.main.get_session_profile")
+    @patch("geoclaw_qgis.cli.main.parse_nl_query")
+    @patch("geoclaw_qgis.cli.main.run_spatial_reasoning")
+    @patch("geoclaw_qgis.cli.main.build_reasoning_input_from_profile")
+    @patch("geoclaw_qgis.cli.main._collect_reasoning_datasets")
+    def test_mall_intent_rejects_conflicting_sre_reroute(
+        self,
+        mock_collect: Mock,
+        mock_build_input: Mock,
+        mock_run_sre: Mock,
+        mock_parse: Mock,
+        mock_session: Mock,
+        _mock_bootstrap: Mock,
+    ) -> None:
+        mock_collect.return_value = []
+        mock_build_input.return_value = object()
+        mock_parse.return_value = NLPlan(
+            query="武汉最适合建商场的前5个地点",
+            intent="run",
+            confidence=0.9,
+            reasons=["run"],
+            cli_args=["run", "--case", "site_selection", "--city", "武汉市", "--top-n", "5"],
+        )
+        mock_session.return_value = type("S", (), {"soul_path": "soul.md", "user_path": "user.md"})()
+        mock_run_sre.return_value = _FakeSRE(
+            {
+                "validation": {"status": "pass_with_warnings"},
+                "execution_plan": {
+                    "safe_to_execute": True,
+                    "route_target": "operator",
+                    "command": ["operator", "--algorithm", "native:buffer"],
+                },
+            },
+            status="pass",
+            task_type="spatial_comparison",
+        )
+
+        args = argparse.Namespace(
+            query=["武汉最适合建商场的前5个地点"],
+            use_sre=True,
+            sre_strict=False,
+            sre_data_dir="",
+            sre_datasets_file="",
+            execute=False,
+        )
+        with io.StringIO() as buf, redirect_stdout(buf):
+            rc = cmd_nl(args)
+            out = buf.getvalue()
+
+        self.assertEqual(rc, 0)
+        payload = _extract_payload(out)
+        self.assertEqual(
+            payload["cli_args"],
+            ["skill", "--", "--skill", "mall_site_selection_qgis", "--set", "top_n=5"],
+        )
+        self.assertTrue(
+            any("cross-intent reroute" in x for x in payload["tool_route_notes"])
+            or any("rejected conflicting SRE reroute" in x for x in payload["tool_route_notes"])
+        )
+
+    @patch("geoclaw_qgis.cli.main.bootstrap_runtime_env")
+    @patch("geoclaw_qgis.cli.main.get_session_profile")
+    @patch("geoclaw_qgis.cli.main.parse_nl_query")
+    @patch("geoclaw_qgis.cli.main.run_spatial_reasoning")
+    @patch("geoclaw_qgis.cli.main.build_reasoning_input_from_profile")
+    @patch("geoclaw_qgis.cli.main._collect_reasoning_datasets")
+    def test_run_intent_preserves_explicit_source_and_top_n_after_sre_run_reroute(
+        self,
+        mock_collect: Mock,
+        mock_build_input: Mock,
+        mock_run_sre: Mock,
+        mock_parse: Mock,
+        mock_session: Mock,
+        _mock_bootstrap: Mock,
+    ) -> None:
+        mock_collect.return_value = []
+        mock_build_input.return_value = object()
+        mock_parse.return_value = NLPlan(
+            query="用武汉市做选址分析前5个并出图",
+            intent="run",
+            confidence=0.9,
+            reasons=["run"],
+            cli_args=["run", "--case", "site_selection", "--city", "武汉市", "--top-n", "5", "--with-maps"],
+        )
+        mock_session.return_value = type("S", (), {"soul_path": "soul.md", "user_path": "user.md"})()
+        mock_run_sre.return_value = _FakeSRE(
+            {
+                "validation": {"status": "pass"},
+                "execution_plan": {
+                    "safe_to_execute": True,
+                    "route_target": "run",
+                    "command": ["run", "--case", "native_cases"],
+                },
+            },
+            status="pass",
+            task_type="spatial_comparison",
+        )
+
+        args = argparse.Namespace(
+            query=["用武汉市做选址分析前5个并出图"],
+            use_sre=True,
+            sre_strict=False,
+            sre_data_dir="",
+            sre_datasets_file="",
+            execute=False,
+        )
+        with io.StringIO() as buf, redirect_stdout(buf):
+            rc = cmd_nl(args)
+            out = buf.getvalue()
+
+        self.assertEqual(rc, 0)
+        payload = _extract_payload(out)
+        self.assertEqual(payload["cli_args"][0:3], ["run", "--case", "native_cases"])
+        self.assertIn("--city", payload["cli_args"])
+        self.assertIn("武汉市", payload["cli_args"])
+        self.assertIn("--top-n", payload["cli_args"])
+        self.assertIn("5", payload["cli_args"])
+        self.assertIn("--with-maps", payload["cli_args"])
+        self.assertTrue(any("Preserved explicit input source" in x for x in payload["tool_route_notes"]))
+        self.assertTrue(any("Preserved explicit NL parameter" in x for x in payload["tool_route_notes"]))
 
     @patch("geoclaw_qgis.cli.main.bootstrap_runtime_env")
     @patch("geoclaw_qgis.cli.main.get_session_profile")

@@ -35,6 +35,9 @@
       "pipeline": "pipelines/cases/mall_site_selection_qgis.yaml",
       "requires_osm": false,
       "default_bbox": "30.50,114.20,30.66,114.45",
+      "pre_steps": [
+        "location_analysis"
+      ],
       "report_path": "data/outputs/mall_site_qgis/pipeline_report.json"
     },
     {

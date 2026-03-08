@@ -1,0 +1,88 @@
+# GeoClaw-OpenAI 新手快速上手（持续维护）
+
+本文档面向不写 Python 的新手用户，目标是用最少命令完成安装、配置、运行和查看结果。
+
+## 1. 你将得到什么
+
+完成本文后，你可以直接用自然语言执行问题，例如：
+
+`武汉最适合建商场的前5个地点`
+
+并得到：
+
+- 候选点空间结果（GeoPackage）
+- 推理报告（Markdown）
+
+## 2. 环境准备
+
+需要具备：
+
+- macOS / Linux（推荐）
+- `python3`（建议 3.10+）
+- QGIS（需包含 `qgis_process`）
+
+在项目根目录执行：
+
+```bash
+bash scripts/check_local_env.sh
+```
+
+## 3. 安装与首次配置
+
+```bash
+bash scripts/install_geoclaw_openai.sh
+geoclaw-openai onboard
+source ~/.geoclaw-openai/env.sh
+```
+
+`onboard` 会引导你配置：
+
+- AI provider（OpenAI / Qwen / Gemini）
+- API Key
+- 默认模型
+- 默认 bbox
+
+## 4. 第一条命令（端到端）
+
+```bash
+geoclaw-openai nl "武汉最适合建商场的前5个地点，输出结果和简要解释" \
+  --use-sre \
+  --sre-reasoner-mode deterministic \
+  --sre-report-out data/outputs/reasoning/wuhan_mall_top5_report.md \
+  --execute
+```
+
+执行完成后，重点看两个文件：
+
+- `data/outputs/mall_site_qgis/mall_candidates.gpkg`
+- `data/outputs/reasoning/wuhan_mall_top5_report.md`
+
+## 5. 不执行先预览（推荐）
+
+先看系统将执行什么命令：
+
+```bash
+geoclaw-openai nl "武汉最适合建商场的前5个地点"
+```
+
+这会输出 `command_preview` 和 `cli_args`，确认后再加 `--execute`。
+
+## 6. 常见问题
+
+1. 报错找不到 `qgis_process`
+   - 重新安装 QGIS，或在 onboard/config 中指定路径。
+2. API 报错
+   - 检查 `~/.geoclaw-openai/env.sh` 的 key 与 base_url。
+3. 结果数量不对
+   - 在问题里明确写 `前N个`，例如 `前5个`。
+4. 输出文件未生成
+   - 检查输出是否在 `data/outputs/` 下（系统安全策略会限制输出目录）。
+
+## 7. 教程维护约定
+
+该文档为长期维护文档。以下变更必须同步更新本教程：
+
+- CLI 参数变化（新增/删除/重命名）
+- 默认模型或 provider 变更
+- 样例输出路径变化
+- 新手入口命令变化

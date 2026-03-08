@@ -1,9 +1,16 @@
 ._*
+**/._*
 __pycache__/
 *.pyc
 
 # local artifacts
-data/
+data/*
+!data/examples/
+data/examples/*
+!data/examples/trajectory/
+!data/examples/trajectory/**
+!data/examples/site_selection/
+!data/examples/site_selection/**
 third_party_trackintel_ref/
 
 *.egg-info/

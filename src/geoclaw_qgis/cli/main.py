@@ -62,6 +62,9 @@ _PATH_HINT_RE = re.compile(r"([~./A-Za-z0-9_\\-]+/[A-Za-z0-9_./\\-]+)")
 _SRE_ALLOWED_ROOT_COMMANDS = {"run", "operator", "network", "skill", "memory", "update", "reasoning"}
 _RUN_CASE_CHOICES = {"location_analysis", "site_selection", "native_cases", "wuhan_advanced"}
 _SRE_SPATIAL_INTENTS = {"run", "operator", "network", "skill"}
+_RUN_SOURCE_FLAGS = ("--data-dir", "--bbox", "--city")
+_RUN_BOOL_FLAGS = ("--with-maps", "--no-maps", "--skip-download", "--force-download")
+_RUN_VALUE_FLAGS = ("--top-n", "--timeout", "--tag", "--raw-dir", "--out-root")
 
 
 def _has_flag_value(cmd: list[str], flag: str) -> bool:
@@ -106,7 +109,7 @@ def _is_sre_route_compatible(*, base_intent: str, new_root: str) -> bool:
     if not intent:
         return True
     if intent == "run":
-        return root in {"run", "operator", "network", "skill"}
+        return root in {"run", "skill"}
     if intent == "operator":
         return root in {"operator", "skill"}
     if intent == "network":
@@ -675,6 +678,76 @@ def _extract_path_hints(text: str) -> list[str]:
     return out
 
 
+def _extract_flag_value(cli_args: list[str], flag: str) -> str:
+    if flag not in cli_args:
+        return ""
+    idx = cli_args.index(flag)
+    if idx + 1 >= len(cli_args):
+        return ""
+    return str(cli_args[idx + 1]).strip()
+
+
+def _remove_flag_with_value(cli_args: list[str], flag: str) -> list[str]:
+    out: list[str] = []
+    i = 0
+    n = len(cli_args)
+    while i < n:
+        token = str(cli_args[i])
+        if token == flag:
+            i += 2
+            continue
+        out.append(token)
+        i += 1
+    return out
+
+
+def _remove_flag(cli_args: list[str], flag: str) -> list[str]:
+    return [str(x) for x in cli_args if str(x) != flag]
+
+
+def _ensure_flag_with_value(cli_args: list[str], flag: str, value: str) -> list[str]:
+    out = _remove_flag_with_value(cli_args, flag)
+    out.extend([flag, value])
+    return out
+
+
+def _enforce_nl_route_constraints(
+    *,
+    plan: NLPlan,
+    routed_cli_args: list[str],
+    route_notes: list[str],
+) -> list[str]:
+    args = [str(x) for x in routed_cli_args if str(x).strip()]
+    if not args:
+        return args
+
+    if plan.intent == "run" and args[0] == "run":
+        base = [str(x) for x in plan.cli_args if str(x).strip()]
+        for source_flag in _RUN_SOURCE_FLAGS:
+            source_value = _extract_flag_value(base, source_flag)
+            if source_value:
+                for remove_flag in _RUN_SOURCE_FLAGS:
+                    args = _remove_flag_with_value(args, remove_flag)
+                args.extend([source_flag, source_value])
+                route_notes.append(f"Preserved explicit input source from NL plan: {source_flag}={source_value}.")
+                break
+
+        for value_flag in _RUN_VALUE_FLAGS:
+            value = _extract_flag_value(base, value_flag)
+            if value:
+                current = _extract_flag_value(args, value_flag)
+                if current != value:
+                    args = _ensure_flag_with_value(args, value_flag, value)
+                    route_notes.append(f"Preserved explicit NL parameter: {value_flag}={value}.")
+
+        for bool_flag in _RUN_BOOL_FLAGS:
+            if bool_flag in base and bool_flag not in args:
+                args.append(bool_flag)
+                route_notes.append(f"Preserved explicit NL switch: {bool_flag}.")
+
+    return args
+
+
 def _load_dataset_specs_file(path_text: str) -> list[dict[str, object]]:
     if not path_text.strip():
         return []
@@ -882,14 +955,20 @@ def cmd_nl(args: argparse.Namespace) -> int:
     route_notes: list[str] = []
     sre_input_data = None
     sre_result = None
+    locked_cli_args: list[str] | None = None
     query_lower = query_text.lower()
     if plan.intent in {"run", "operator"} and any(k in query_lower for k in ("mall", "shopping", "商场")):
         preferred = "mall_site_selection_qgis"
         if any(k in query_lower for k in ("llm", "ai", "大模型")):
             preferred = "mall_site_selection_llm"
         routed_cli_args = ["skill", "--", "--skill", preferred]
-        if preferred == "mall_site_selection_qgis":
+        top_n = _extract_flag_value(plan.cli_args, "--top-n")
+        if top_n and preferred == "mall_site_selection_qgis":
+            routed_cli_args.extend(["--set", f"top_n={top_n}"])
+            route_notes.append(f"Preserved NL top-n for skill pipeline: top_n={top_n}.")
+        if "--skip-download" in plan.cli_args and preferred == "mall_site_selection_qgis":
             routed_cli_args.append("--skip-download")
+        locked_cli_args = list(routed_cli_args)
         route_notes.append(f"Tool router prioritized registered skill={preferred} by soul execution hierarchy.")
 
     sre_payload: dict[str, object] | None = None
@@ -936,6 +1015,11 @@ def cmd_nl(args: argparse.Namespace) -> int:
                 routed_cli_args = _apply_sre_task_route(routed_cli_args, sre_result.task_profile.task_type, route_notes)
             else:
                 route_notes.append("SRE execution plan took precedence over legacy task route remapping.")
+            if locked_cli_args is not None and routed_cli_args != locked_cli_args:
+                routed_cli_args = list(locked_cli_args)
+                route_notes.append(
+                    "Kept explicit NL-prioritized skill route; rejected conflicting SRE reroute."
+                )
             if args.sre_strict and sre_result.validation.status == "fail":
                 route_notes.append("SRE strict mode blocked execution because validation status=fail.")
         except Exception as exc:
@@ -944,6 +1028,12 @@ def cmd_nl(args: argparse.Namespace) -> int:
             route_notes.append(f"SRE disabled due to non-blocking error: {exc}")
     elif bool(args.use_sre):
         route_notes.append(f"SRE skipped for non-spatial intent={plan.intent}.")
+
+    routed_cli_args = _enforce_nl_route_constraints(
+        plan=plan,
+        routed_cli_args=routed_cli_args,
+        route_notes=route_notes,
+    )
 
     nl_report_md = ""
     nl_report_meta: dict[str, object] | None = None
