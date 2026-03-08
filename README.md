@@ -185,6 +185,40 @@ geoclaw-openai config set --ai-provider gemini --ai-base-url "https://generative
 - 先用 `*-latest` 别名减少文档老化。
 - 追求可复现时，改用固定版本模型名。
 
+## 4.2 本地模型（Ollama）完整配置
+
+如果你希望完全本地运行模型，可按下面步骤配置：
+
+```bash
+# 1) 安装 Ollama（macOS 示例）
+brew install ollama
+
+# 2) 启动 Ollama 服务（保持后台运行）
+ollama serve
+
+# 3) 拉取一个本地模型
+ollama pull llama3.1:8b
+
+# 4) 接入 GeoClaw
+geoclaw-openai onboard --non-interactive \
+  --ai-provider ollama \
+  --ai-base-url "http://127.0.0.1:11434/v1" \
+  --ai-model "llama3.1:8b"
+source ~/.geoclaw-openai/env.sh
+
+# 5) 验证 Ollama 服务是否可用
+curl http://127.0.0.1:11434/api/tags
+
+# 6) 验证 GeoClaw 当前 provider
+geoclaw-openai config show
+```
+
+常见问题排查：
+- `Connection refused`：先确认 `ollama serve` 正在运行。
+- 模型不存在：先执行 `ollama pull <model_name>`。
+- 端口被改动：把 `--ai-base-url` 改成你的实际地址，例如 `http://127.0.0.1:11435/v1`。
+- 需要切换回云端模型：执行 `geoclaw-openai config set --ai-provider openai|qwen|gemini ...`。
+
 ## 5. 自然语言入口
 
 ```bash
