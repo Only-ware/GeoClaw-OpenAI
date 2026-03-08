@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 全量复盘（截至 v2.4.0）
+# GeoClaw-OpenAI 全量复盘（截至 v3.0.0）
 
 更新时间：2026-03-08（Asia/Shanghai）  
 项目：GeoClaw-OpenAI  
@@ -6,7 +6,7 @@
 
 ## 1. 复盘目标
 
-本文档总结项目从框架搭建到 v2.4.0 的核心演进、技术决策与当前边界，作为团队后续开发基线。
+本文档总结项目从框架搭建到 v3.0.0 的核心演进、技术决策与当前边界，作为团队后续开发基线。
 
 ## 2. 版本里程碑
 
@@ -22,10 +22,11 @@
 4. `v2.1.0`
 - 融合 TrackIntel 轨迹处理与 OD 网络分析。
 
-5. `v2.4.0`
+5. `v3.0.0`
 - 引入 `soul.md + user.md` 双层个性化架构并完成会话初始化加载。
 - planner/tool-router/report/memory 四模块消费结构化 profile 对象。
 - 新增 `profile init/show` 用户引导命令。
+- SRE 3.0 重构里程碑 A-F 收口并新增 NL 端到端报告输出。
 
 ## 3. 当前能力版图
 
@@ -35,6 +36,7 @@
 - AI 扩展：Skill + 多 provider
 - 个性化层：Soul（系统）+ User（用户）
 - 智能交互：自然语言解析到 CLI
+- 端到端报告：NL -> SRE -> Markdown 报告
 - 记忆闭环：记录、复盘、归档、检索
 - 轨迹分析：TrackIntel OD 网络
 - 维护能力：自更新、day-run 回归
@@ -82,10 +84,10 @@
 
 ## 8. 结论
 
-GeoClaw-OpenAI 已完成从“原型验证”到“可复现科研工程系统”的转变。v2.4.0 的核心价值在于：
+GeoClaw-OpenAI 已完成从“原型验证”到“可复现科研工程系统”的转变。v3.0.0 的核心价值在于：
 
 - 功能更完整（GIS + AI + Memory + NL + Mobility）
 - 运行更安全（输出隔离）
 - 扩展更灵活（多 provider + Skill + Profile Layers）
 
-该版本可作为团队后续 2.x 迭代的稳定基线。
+该版本可作为团队后续 3.x 迭代的稳定基线。

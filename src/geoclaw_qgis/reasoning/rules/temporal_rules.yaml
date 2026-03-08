@@ -1,0 +1,6 @@
+temporal_rules:
+  change_detection_min_slices: 2
+constraints:
+  change_detection_requires_multiple_time_slices: change_detection_requires_multiple_time_slices
+warnings:
+  insufficient_temporal_slices: insufficient_temporal_slices_for_change_detection

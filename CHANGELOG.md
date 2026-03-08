@@ -2,6 +2,22 @@
 
 All notable changes to this project are documented in this file.
 
+## [3.0.0] - 2026-03-08
+
+### Added
+- Added NL end-to-end SRE report output options:
+  - `geoclaw-openai nl ... --sre-report-out <path>`
+  - `geoclaw-openai nl ... --sre-print-report`
+- Added NL SRE report tests in:
+  - `src/geoclaw_qgis/tests/test_nl_sre_routing.py`
+
+### Changed
+- Bumped project/package runtime version to `3.0.0`.
+- Closed SRE 3.0 internal milestones (A-F) with hardened runtime and docs convergence.
+- Expanded `scripts/day_run.sh` to an 11-step matrix covering:
+  - `run + skill + reasoning + nl(use-sre) + memory`
+- Updated README/docs and regenerated engineering manual docx/pdf for v3.0.0.
+
 ## [2.4.0] - 2026-03-08
 
 ### Added

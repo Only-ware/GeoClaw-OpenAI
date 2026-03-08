@@ -1,0 +1,6 @@
+task_type: proximity_analysis
+methods:
+  - buffer
+  - multi_ring_buffer
+  - distance_to_nearest
+  - spatial_join_by_distance

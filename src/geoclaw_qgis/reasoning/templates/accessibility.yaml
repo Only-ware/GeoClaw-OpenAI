@@ -1,0 +1,5 @@
+task_type: accessibility_analysis
+methods:
+  - service_area
+  - travel_time_catchment
+  - network_reachability

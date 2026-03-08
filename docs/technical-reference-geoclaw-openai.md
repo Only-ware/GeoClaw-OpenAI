@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 技术参考（科研与团队版，v2.4.0）
+# GeoClaw-OpenAI 技术参考（科研与团队版，v3.0.0）
 
 更新时间：2026-03-08（Asia/Shanghai）  
 机构：UrbanComp Lab @ China University of Geosciences (Wuhan)
@@ -165,6 +165,7 @@ geoclaw-openai operator --algorithm native:buffer --params-file configs/examples
 
 # 自然语言
 geoclaw-openai nl "用武汉市做选址分析，前20个，出图" --execute
+geoclaw-openai nl "商场选址分析，优先可复现QGIS流程" --use-sre --sre-report-out data/outputs/reasoning/nl_e2e_report.md
 
 # 记忆
 geoclaw-openai memory archive --before-days 7
@@ -178,6 +179,10 @@ geoclaw-openai update --check-only
 
 - 单元测试：`python3 -m unittest discover -s src/geoclaw_qgis/tests`
 - day-run：`bash scripts/day_run.sh`
+  - 覆盖 `run + skill + reasoning + nl(use-sre) + memory` 回归矩阵
+  - 固定校验输出包含：
+    - `data/outputs/reasoning/day_run_reasoning.md`
+    - `data/outputs/reasoning/day_run_nl_e2e_report.md`
 - 轨迹 demo：`bash scripts/run_trackintel_network_demo.sh`
 
 ## 8. TODO（技术路线）

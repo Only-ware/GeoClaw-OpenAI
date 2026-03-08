@@ -1,5 +1,40 @@
 # GeoClaw-OpenAI Release Notes
 
+## v3.0.0 (2026-03-08)
+
+主要迭代：
+
+1. 版本升级
+   - 包版本与运行时版本升级为 `3.0.0`。
+
+2. SRE 3.0 重构阶段收口（Milestone A-F）
+   - 规则与模板配置化（`reasoning/rules/*.yaml`、`reasoning/templates/*.yaml`）。
+   - `execution_plan` 路由安全校验（白名单、命令形状、跨意图阻断）。
+   - 高级推理字段（`reasoning_mode`、`uncertainty_score`、`sensitivity_hints`）及报告输出。
+   - 外部 LLM reasoner 支持配置化模板、结构化校验重试、strict/non-strict 降级策略。
+   - 外部错误详情脱敏，避免 API key 片段进入结果。
+
+3. 端到端询问并输出报告（NL + SRE）
+   - `nl` 新增：
+     - `--sre-report-out`：将 SRE 推理报告直接写入 `data/outputs`。
+     - `--sre-print-report`：在终端输出 Markdown 报告。
+   - 形成“自然语言询问 -> SRE 推理 -> 报告输出”的端到端链路。
+
+4. day-run 扩展与回归收敛
+   - `scripts/day_run.sh` 扩展为 11 步回归矩阵：
+     - `run`（native + advanced）
+     - `skill`（location + site）
+     - `reasoning` 报告
+     - `nl --use-sre` 报告
+     - `memory` 冒烟
+   - 固定校验产物新增：
+     - `data/outputs/reasoning/day_run_reasoning.md`
+     - `data/outputs/reasoning/day_run_nl_e2e_report.md`
+
+5. 文档与工程说明书更新
+   - README、docs 与技术说明同步到 `v3.0.0`。
+   - 工程说明书 `GeoClaw-OpenAI_工程说明书.docx/.pdf` 重新生成并纳入本次发布。
+
 ## v2.4.0 (2026-03-08)
 
 主要迭代：

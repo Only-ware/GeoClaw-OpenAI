@@ -5,6 +5,7 @@ import datetime as dt
 import getpass
 import json
 import os
+import re
 import shlex
 import subprocess
 import sys
@@ -27,6 +28,14 @@ from geoclaw_qgis.memory import TaskMemoryStore
 from geoclaw_qgis.nl import NLPlan, parse_nl_query
 from geoclaw_qgis.profile import SessionProfile, ensure_profile_layers, load_session_profile
 from geoclaw_qgis.project_info import LAB_AFFILIATION, PROJECT_NAME, PROJECT_VERSION
+from geoclaw_qgis.reasoning import run_spatial_reasoning
+from geoclaw_qgis.reasoning.data_catalog_adapter import (
+    dataset_spec_from_path,
+    discover_datasets_from_dir,
+    merge_dataset_specs,
+)
+from geoclaw_qgis.reasoning.input_adapter import build_reasoning_input_from_profile
+from geoclaw_qgis.reasoning.report_generator import render_reasoning_report
 from geoclaw_qgis.security import OutputSecurityError, fixed_output_root, validate_output_targets
 from geoclaw_qgis.skills import assess_skill_spec, load_skill_spec_file, upsert_skill_registry
 
@@ -49,6 +58,72 @@ AI_PROVIDER_PRESETS: dict[str, dict[str, str]] = {
     },
 }
 _SESSION_PROFILE: SessionProfile | None = None
+_PATH_HINT_RE = re.compile(r"([~./A-Za-z0-9_\\-]+/[A-Za-z0-9_./\\-]+)")
+_SRE_ALLOWED_ROOT_COMMANDS = {"run", "operator", "network", "skill", "memory", "update", "reasoning"}
+_RUN_CASE_CHOICES = {"location_analysis", "site_selection", "native_cases", "wuhan_advanced"}
+_SRE_SPATIAL_INTENTS = {"run", "operator", "network", "skill"}
+
+
+def _has_flag_value(cmd: list[str], flag: str) -> bool:
+    if flag not in cmd:
+        return False
+    idx = cmd.index(flag)
+    return idx + 1 < len(cmd) and bool(str(cmd[idx + 1]).strip())
+
+
+def _validate_sre_command_shape(cmd: list[str]) -> tuple[bool, str]:
+    if not cmd:
+        return False, "empty command"
+    root = cmd[0]
+    if root == "run":
+        if not _has_flag_value(cmd, "--case"):
+            return False, "run command missing --case"
+        idx = cmd.index("--case")
+        case = str(cmd[idx + 1]).strip()
+        if case not in _RUN_CASE_CHOICES:
+            return False, f"run command uses unsupported case={case}"
+        return True, ""
+    if root == "operator":
+        if not _has_flag_value(cmd, "--algorithm"):
+            return False, "operator command missing --algorithm"
+        return True, ""
+    if root == "network":
+        if not _has_flag_value(cmd, "--pfs-csv"):
+            return False, "network command missing --pfs-csv"
+        return True, ""
+    if root == "skill":
+        if "--skill" in cmd and _has_flag_value(cmd, "--skill"):
+            return True, ""
+        if "--list" in cmd:
+            return True, ""
+        return False, "skill command missing --skill/--list"
+    return True, ""
+
+
+def _is_sre_route_compatible(*, base_intent: str, new_root: str) -> bool:
+    intent = str(base_intent or "").strip().lower()
+    root = str(new_root or "").strip().lower()
+    if not intent:
+        return True
+    if intent == "run":
+        return root in {"run", "operator", "network", "skill"}
+    if intent == "operator":
+        return root in {"operator", "skill"}
+    if intent == "network":
+        return root in {"network", "skill"}
+    if intent == "skill":
+        return root == "skill"
+    return False
+
+
+def _set_reasoner_env_overrides(*, mode: str = "", retries: int | None = None, strict_external: bool = False) -> None:
+    mode_clean = str(mode or "").strip().lower()
+    if mode_clean in {"auto", "deterministic", "external"}:
+        os.environ["GEOCLAW_SRE_REASONER_MODE"] = mode_clean
+    if retries is not None and int(retries) > 0:
+        os.environ["GEOCLAW_SRE_LLM_MAX_RETRIES"] = str(int(retries))
+    if bool(strict_external):
+        os.environ["GEOCLAW_SRE_STRICT_EXTERNAL"] = "1"
 
 
 def ask_value(prompt: str, default: str = "") -> str:
@@ -565,6 +640,236 @@ def cmd_memory_search(args: argparse.Namespace) -> int:
     return 0
 
 
+def _task_type_from_plan(plan: NLPlan) -> str:
+    if plan.intent == "network":
+        return "trajectory_analysis"
+    if plan.intent == "operator":
+        return "proximity_analysis"
+    if plan.intent == "skill":
+        joined = " ".join(plan.cli_args).lower()
+        if "site" in joined or "mall" in joined or "选址" in joined:
+            return "site_selection"
+        return "spatial_comparison"
+    if plan.intent == "run":
+        args = list(plan.cli_args)
+        if "--case" in args:
+            idx = args.index("--case")
+            if idx + 1 < len(args):
+                case = args[idx + 1]
+                if case == "site_selection":
+                    return "site_selection"
+                if case == "location_analysis":
+                    return "proximity_analysis"
+                if case == "wuhan_advanced":
+                    return "spatial_comparison"
+        return "spatial_comparison"
+    return "spatial_comparison"
+
+
+def _extract_path_hints(text: str) -> list[str]:
+    out: list[str] = []
+    for raw in _PATH_HINT_RE.findall(text):
+        p = str(raw).strip()
+        if p and p not in out:
+            out.append(p)
+    return out
+
+
+def _load_dataset_specs_file(path_text: str) -> list[dict[str, object]]:
+    if not path_text.strip():
+        return []
+    path = Path(path_text).expanduser().resolve()
+    if not path.exists():
+        raise FileNotFoundError(f"datasets-file not found: {path}")
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if isinstance(payload, dict):
+        rows = payload.get("datasets")
+        if isinstance(rows, list):
+            return [x for x in rows if isinstance(x, dict)]
+        return []
+    if isinstance(payload, list):
+        return [x for x in payload if isinstance(x, dict)]
+    return []
+
+
+def _collect_reasoning_datasets(
+    *,
+    query_text: str,
+    data_dir: str = "",
+    datasets_file: str = "",
+) -> list[dict[str, object]]:
+    specs = _load_dataset_specs_file(datasets_file)
+
+    discovered: list[dict[str, object]] = []
+    if data_dir.strip():
+        discovered.extend(discover_datasets_from_dir(data_dir))
+
+    for raw in _extract_path_hints(query_text):
+        p = Path(raw).expanduser().resolve()
+        if p.exists() and p.is_file():
+            try:
+                discovered.append(dataset_spec_from_path(p))
+            except Exception:
+                continue
+        elif p.exists() and p.is_dir():
+            try:
+                discovered.extend(discover_datasets_from_dir(p))
+            except Exception:
+                continue
+
+    return merge_dataset_specs(base=specs, extra=discovered)
+
+
+def _apply_sre_task_route(routed_cli_args: list[str], task_type: str, route_notes: list[str]) -> list[str]:
+    args = list(routed_cli_args)
+    if not args:
+        return args
+    if args[0] != "run":
+        return args
+
+    case_map = {
+        "site_selection": "site_selection",
+        "proximity_analysis": "location_analysis",
+        "accessibility_analysis": "location_analysis",
+        "change_detection": "wuhan_advanced",
+    }
+    mapped = case_map.get(task_type, "")
+    if not mapped:
+        return args
+    if "--case" not in args:
+        return args
+    idx = args.index("--case")
+    if idx + 1 >= len(args):
+        return args
+    prev_case = args[idx + 1]
+    if prev_case != mapped:
+        args[idx + 1] = mapped
+        route_notes.append(f"SRE remapped run case: {prev_case} -> {mapped}.")
+    return args
+
+
+def _apply_sre_execution_plan(
+    routed_cli_args: list[str],
+    *,
+    sre_payload: dict[str, object] | None,
+    base_intent: str = "",
+    route_notes: list[str],
+) -> tuple[list[str], bool]:
+    if not isinstance(sre_payload, dict):
+        return routed_cli_args, False
+    execution = sre_payload.get("execution_plan")
+    if not isinstance(execution, dict):
+        return routed_cli_args, False
+    if not bool(execution.get("safe_to_execute", False)):
+        reasons = execution.get("blocking_reasons")
+        if isinstance(reasons, list) and reasons:
+            route_notes.append(
+                "SRE execution plan blocked: " + "; ".join(str(x).strip() for x in reasons if str(x).strip())
+            )
+        else:
+            route_notes.append("SRE execution plan is not safe_to_execute; keep current route.")
+        return routed_cli_args, False
+    cmd = execution.get("command")
+    if not isinstance(cmd, list):
+        return routed_cli_args, False
+    safe_cmd = [str(x).strip() for x in cmd if str(x).strip()]
+    if not safe_cmd:
+        return routed_cli_args, False
+    if safe_cmd[0] not in _SRE_ALLOWED_ROOT_COMMANDS:
+        route_notes.append(f"SRE execution plan rejected unsupported root command: {safe_cmd[0]}")
+        return routed_cli_args, False
+    if not _is_sre_route_compatible(base_intent=base_intent, new_root=safe_cmd[0]):
+        route_notes.append(
+            f"SRE execution plan rejected cross-intent reroute: intent={base_intent} -> root={safe_cmd[0]}"
+        )
+        return routed_cli_args, False
+    ok, reason = _validate_sre_command_shape(safe_cmd)
+    if not ok:
+        route_notes.append(f"SRE execution plan rejected invalid command shape: {reason}")
+        return routed_cli_args, False
+    route_notes.append(f"SRE execution plan applied: route_target={execution.get('route_target', '')}.")
+    return safe_cmd, True
+
+
+def cmd_reasoning(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    session = get_session_profile()
+    query_text = " ".join(args.query).strip()
+    if not query_text:
+        raise ValueError("query text is required")
+
+    _set_reasoner_env_overrides(
+        mode=getattr(args, "reasoner_mode", "") or "",
+        retries=getattr(args, "llm_retries", None),
+        strict_external=bool(getattr(args, "strict_external", False)),
+    )
+
+    datasets = _collect_reasoning_datasets(
+        query_text=query_text,
+        data_dir=args.data_dir or "",
+        datasets_file=args.datasets_file or "",
+    )
+    input_data = build_reasoning_input_from_profile(
+        query=query_text,
+        session=session,
+        datasets=datasets,
+        planner_hints={
+            "candidate_task_type": args.planner_task or "",
+            "candidate_methods": args.planner_method or [],
+        },
+        project_context={
+            "study_area": args.project_study_area or "",
+            "default_crs": args.project_crs or "",
+            "analysis_goal": args.project_goal or "",
+        },
+    )
+    result = run_spatial_reasoning(input_data)
+    payload = {
+        "input": input_data.to_dict(),
+        "result": result.to_dict(),
+        "profile_layers": {
+            "soul_path": session.soul_path,
+            "user_path": session.user_path,
+        },
+    }
+
+    report_md = ""
+    if bool(args.report_out) or bool(args.print_report):
+        report_md = render_reasoning_report(input_data=input_data, result=result)
+
+    if bool(args.report_out):
+        workspace_root = resolve_workspace_root()
+        try:
+            validate_output_targets(
+                {"OUTPUT": str(args.report_out)},
+                workspace_root=workspace_root,
+                safe_output_root=fixed_output_root(workspace_root),
+            )
+        except OutputSecurityError as exc:
+            raise RuntimeError(f"reasoning report output security check failed: {exc}") from exc
+
+        report_path = Path(str(args.report_out)).expanduser()
+        if not report_path.is_absolute():
+            report_path = (workspace_root / report_path).resolve()
+        else:
+            report_path = report_path.resolve()
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(report_md, encoding="utf-8")
+        payload["report"] = {
+            "path": str(report_path),
+            "format": "markdown",
+            "size_bytes": len(report_md.encode("utf-8")),
+        }
+
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    if bool(args.print_report):
+        print("\n# --- Reasoning Report (Markdown) ---\n")
+        print(report_md)
+    if args.strict and result.validation.status == "fail":
+        return 1
+    return 0
+
+
 def cmd_nl(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
     query_text = " ".join(args.query).strip()
@@ -575,6 +880,8 @@ def cmd_nl(args: argparse.Namespace) -> int:
     plan: NLPlan = parse_nl_query(query_text, session=session)
     routed_cli_args = list(plan.cli_args)
     route_notes: list[str] = []
+    sre_input_data = None
+    sre_result = None
     query_lower = query_text.lower()
     if plan.intent in {"run", "operator"} and any(k in query_lower for k in ("mall", "shopping", "商场")):
         preferred = "mall_site_selection_qgis"
@@ -584,6 +891,93 @@ def cmd_nl(args: argparse.Namespace) -> int:
         if preferred == "mall_site_selection_qgis":
             routed_cli_args.append("--skip-download")
         route_notes.append(f"Tool router prioritized registered skill={preferred} by soul execution hierarchy.")
+
+    sre_payload: dict[str, object] | None = None
+    if bool(args.use_sre) and plan.intent in _SRE_SPATIAL_INTENTS:
+        try:
+            _set_reasoner_env_overrides(
+                mode=getattr(args, "sre_reasoner_mode", "") or "",
+                retries=getattr(args, "sre_llm_retries", None),
+                strict_external=bool(getattr(args, "sre_strict_external", False)),
+            )
+            datasets = _collect_reasoning_datasets(
+                query_text=query_text,
+                data_dir=args.sre_data_dir or "",
+                datasets_file=args.sre_datasets_file or "",
+            )
+            input_data = build_reasoning_input_from_profile(
+                query=query_text,
+                session=session,
+                datasets=datasets,
+                planner_hints={
+                    "candidate_task_type": _task_type_from_plan(plan),
+                    "candidate_methods": [],
+                },
+                project_context={
+                    "analysis_goal": "nl_command_planning",
+                },
+            )
+            sre_input_data = input_data
+            sre_result = run_spatial_reasoning(input_data)
+            sre_payload = sre_result.to_dict()
+            req = list(sre_result.validation.required_preconditions or [])
+            rev = list(sre_result.validation.revisions_applied or [])
+            if req:
+                route_notes.append("SRE required_preconditions: " + ", ".join(req))
+            if rev:
+                route_notes.append("SRE revisions_applied: " + ", ".join(rev))
+            routed_cli_args, execution_plan_applied = _apply_sre_execution_plan(
+                routed_cli_args,
+                sre_payload=sre_payload,
+                base_intent=plan.intent,
+                route_notes=route_notes,
+            )
+            if not execution_plan_applied:
+                routed_cli_args = _apply_sre_task_route(routed_cli_args, sre_result.task_profile.task_type, route_notes)
+            else:
+                route_notes.append("SRE execution plan took precedence over legacy task route remapping.")
+            if args.sre_strict and sre_result.validation.status == "fail":
+                route_notes.append("SRE strict mode blocked execution because validation status=fail.")
+        except Exception as exc:
+            if args.sre_strict:
+                raise
+            route_notes.append(f"SRE disabled due to non-blocking error: {exc}")
+    elif bool(args.use_sre):
+        route_notes.append(f"SRE skipped for non-spatial intent={plan.intent}.")
+
+    nl_report_md = ""
+    nl_report_meta: dict[str, object] | None = None
+    if bool(getattr(args, "sre_report_out", "")) or bool(getattr(args, "sre_print_report", False)):
+        if not bool(args.use_sre):
+            raise RuntimeError("NL SRE report requires --use-sre.")
+        if sre_input_data is None or sre_result is None:
+            raise RuntimeError("NL SRE report requires spatial intent and successful SRE result.")
+        nl_report_md = render_reasoning_report(input_data=sre_input_data, result=sre_result)
+
+        report_out = str(getattr(args, "sre_report_out", "") or "").strip()
+        if report_out:
+            workspace_root = resolve_workspace_root()
+            try:
+                validate_output_targets(
+                    {"OUTPUT": report_out},
+                    workspace_root=workspace_root,
+                    safe_output_root=fixed_output_root(workspace_root),
+                )
+            except OutputSecurityError as exc:
+                raise RuntimeError(f"nl sre report output security check failed: {exc}") from exc
+
+            report_path = Path(report_out).expanduser()
+            if not report_path.is_absolute():
+                report_path = (workspace_root / report_path).resolve()
+            else:
+                report_path = report_path.resolve()
+            report_path.parent.mkdir(parents=True, exist_ok=True)
+            report_path.write_text(nl_report_md, encoding="utf-8")
+            nl_report_meta = {
+                "path": str(report_path),
+                "format": "markdown",
+                "size_bytes": len(nl_report_md.encode("utf-8")),
+            }
 
     payload = {
         "query": plan.query,
@@ -597,9 +991,22 @@ def cmd_nl(args: argparse.Namespace) -> int:
             "soul_path": session.soul_path,
             "user_path": session.user_path,
         },
+        "sre_enabled": bool(args.use_sre),
+        "sre": sre_payload,
         "execute": bool(args.execute),
     }
+    if nl_report_meta is not None:
+        payload["sre_report"] = nl_report_meta
     print(json.dumps(payload, ensure_ascii=False, indent=2))
+    if bool(getattr(args, "sre_print_report", False)):
+        print("\n# --- NL SRE Report (Markdown) ---\n")
+        print(nl_report_md)
+
+    if bool(args.use_sre) and bool(args.sre_strict):
+        if isinstance(sre_payload, dict):
+            validation = sre_payload.get("validation")
+            if isinstance(validation, dict) and str(validation.get("status", "")).strip().lower() == "fail":
+                return 1
 
     if not args.execute:
         print("[NL] 预览模式：加 --execute 将执行上述命令。")
@@ -981,6 +1388,32 @@ def build_parser() -> argparse.ArgumentParser:
     network.add_argument("--dry-run", action="store_true", help="only print resolved parameters")
     network.set_defaults(func=cmd_network)
 
+    reasoning = sub.add_parser("reasoning", help="run Spatial Reasoning Engine (internal)")
+    reasoning.add_argument("query", nargs="+", help="reasoning query text")
+    reasoning.add_argument("--datasets-file", default="", help="JSON datasets payload file")
+    reasoning.add_argument("--data-dir", default="", help="auto-discover datasets from local directory")
+    reasoning.add_argument("--planner-task", default="", help="planner candidate task type")
+    reasoning.add_argument("--planner-method", action="append", default=[], help="planner candidate method (repeatable)")
+    reasoning.add_argument("--project-study-area", default="", help="project study area")
+    reasoning.add_argument("--project-crs", default="", help="project default CRS")
+    reasoning.add_argument("--project-goal", default="", help="project analysis goal")
+    reasoning.add_argument(
+        "--reasoner-mode",
+        default="",
+        choices=["", "auto", "deterministic", "external"],
+        help="optional override for SRE reasoner mode",
+    )
+    reasoning.add_argument("--llm-retries", type=int, default=0, help="optional override for external LLM retries")
+    reasoning.add_argument("--strict-external", action="store_true", help="fail if external reasoner is unavailable")
+    reasoning.add_argument(
+        "--report-out",
+        default="",
+        help="optional markdown report output path (must be under data/outputs)",
+    )
+    reasoning.add_argument("--print-report", action="store_true", help="print markdown report after JSON payload")
+    reasoning.add_argument("--strict", action="store_true", help="return non-zero if validation fails")
+    reasoning.set_defaults(func=cmd_reasoning)
+
     memory = sub.add_parser("memory", help="manage short-term and long-term task memory")
     memory_sub = memory.add_subparsers(dest="memory_cmd", required=True)
 
@@ -1019,6 +1452,24 @@ def build_parser() -> argparse.ArgumentParser:
 
     nl = sub.add_parser("nl", help="run geoclaw-openai from natural language")
     nl.add_argument("query", nargs="+", help="natural language request text")
+    nl.add_argument("--use-sre", action="store_true", help="use SRE for gray-route planning")
+    nl.add_argument("--sre-strict", action="store_true", help="fail when SRE validation status is fail")
+    nl.add_argument("--sre-data-dir", default="", help="optional data dir for SRE dataset discovery")
+    nl.add_argument("--sre-datasets-file", default="", help="optional JSON file for SRE datasets")
+    nl.add_argument(
+        "--sre-reasoner-mode",
+        default="",
+        choices=["", "auto", "deterministic", "external"],
+        help="optional override for SRE reasoner mode",
+    )
+    nl.add_argument("--sre-llm-retries", type=int, default=0, help="optional override for external LLM retries")
+    nl.add_argument("--sre-strict-external", action="store_true", help="fail if external reasoner is unavailable")
+    nl.add_argument(
+        "--sre-report-out",
+        default="",
+        help="optional markdown report output path from SRE result (must be under data/outputs)",
+    )
+    nl.add_argument("--sre-print-report", action="store_true", help="print SRE markdown report after JSON payload")
     nl.add_argument("--execute", action="store_true", help="execute parsed command immediately")
     nl.set_defaults(func=cmd_nl)
 

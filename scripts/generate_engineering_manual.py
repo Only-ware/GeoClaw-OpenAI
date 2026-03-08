@@ -19,7 +19,7 @@ PDF_OUTPUT = ROOT / "GeoClaw-OpenAI_工程说明书.pdf"
 
 TITLE = "GeoClaw-OpenAI 工程说明书"
 SUBTITLE = "UrbanComp Lab @ China University of Geosciences (Wuhan)"
-VERSION = "2.4.0"
+VERSION = "3.0.0"
 TODAY = dt.date.today().isoformat()
 
 sections: list[tuple[str, list[str]]] = [
@@ -28,7 +28,7 @@ sections: list[tuple[str, list[str]]] = [
         [
             "GeoClaw-OpenAI 面向科研、教学与工程团队，提供可复现的 GIS+AI 全流程能力。",
             "项目目标是将数据获取、空间分析、制图表达、AI 解释、Skill 扩展与任务记忆闭环统一到单一 CLI。",
-            "v2.4.0 重点引入 Soul/User 双层个性化机制，增强系统边界约束与用户长期偏好驱动能力。",
+            "v3.0.0 形成 SRE+NL+Skill+Memory 的稳定闭环，并支持端到端询问与报告输出。",
         ],
     ),
     (
@@ -60,6 +60,7 @@ sections: list[tuple[str, list[str]]] = [
             "4.3 选址分析：约束筛选 + 综合评分排序，输出 SITE_RANK 与 SITE_CLASS。",
             "4.4 栅格/矢量分析：基于 QGIS Processing 算子与 pipeline 参数化运行。",
             "4.5 自然语言入口：NL 解析为 CLI 执行计划，可预览或直接执行。",
+            "4.5.1 端到端报告：NL 在启用 SRE 时可直接输出标准化推理报告（受输出目录安全策略约束）。",
             "4.6 Soul/User 分层：soul.md 定义系统边界，user.md 定义用户长期偏好，统一解析后供 planner/router/report/memory 复用。",
             "4.7 Skill 扩展：支持 LLM 技能与 QGIS 技能双路径，并提供注册前安全评估。",
             "4.8 Memory 体系：短期记录、长期复盘、归档与向量检索，支持任务经验复用。",
@@ -67,12 +68,12 @@ sections: list[tuple[str, list[str]]] = [
         ],
     ),
     (
-        "5. 2.4.0 版本新增重点",
+        "5. 3.0.0 版本新增重点",
         [
-            "5.1 新增 soul.md + user.md 双层长期配置，并自动在会话初始化加载。",
-            "5.2 planner/tool-router/report/memory 四模块接入结构化 profile 对象。",
-            "5.3 新增 profile CLI：profile init/show，便于用户配置与排障。",
-            "5.4 文档与工程说明书同步升级到 v2.4.0。",
+            "5.1 Milestone A-F 收口：SRE 配置化、路由安全、高级推理、外部 reasoner 校验重试完成。",
+            "5.2 day-run 扩展为 11 步回归矩阵，覆盖 run/skill/reasoning/nl(use-sre)/memory。",
+            "5.3 新增 NL 端到端报告输出参数：--sre-report-out / --sre-print-report。",
+            "5.4 版本与文档体系升级到 v3.0.0。",
         ],
     ),
     (
@@ -82,9 +83,10 @@ sections: list[tuple[str, list[str]]] = [
             "6.2 安装与初始化：bash scripts/install_geoclaw_openai.sh && geoclaw-openai onboard。",
             "6.3 初始化 profile：geoclaw-openai profile init && geoclaw-openai profile show。",
             "6.4 标准分析：geoclaw-openai run --case native_cases --city \"武汉市\"。",
-            "6.5 Skill 安全评估：geoclaw-openai skill-registry assess --spec-file <skill.json>。",
-            "6.6 通过评估后注册：geoclaw-openai skill-registry register --spec-file <skill.json> --confirm。",
-            "6.7 回归测试：python3 -m unittest discover -s src/geoclaw_qgis/tests。",
+            "6.5 端到端询问+报告：geoclaw-openai nl \"商场选址分析\" --use-sre --sre-report-out data/outputs/reasoning/nl_report.md。",
+            "6.6 Skill 安全评估：geoclaw-openai skill-registry assess --spec-file <skill.json>。",
+            "6.7 通过评估后注册：geoclaw-openai skill-registry register --spec-file <skill.json> --confirm。",
+            "6.8 回归测试：python3 -m unittest discover -s src/geoclaw_qgis/tests。",
         ],
     ),
     (

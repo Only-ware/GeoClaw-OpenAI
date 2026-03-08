@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 开发指南（v2.4.0）
+# GeoClaw-OpenAI 开发指南（v3.0.0）
 
 本文档用于后续开发与维护，重点说明工程结构、核心机制、扩展入口与本地验证流程。
 
@@ -128,6 +128,7 @@ geoclaw-openai operator \
 ```bash
 geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
 geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
+geoclaw-openai nl "商场选址分析，优先可复现QGIS流程" --use-sre --sre-report-out data/outputs/reasoning/nl_e2e_report.md
 ```
 
 ### 6.4 轨迹网络
@@ -141,6 +142,21 @@ bash scripts/run_trackintel_network_demo.sh
 ```bash
 bash scripts/day_run.sh
 ```
+
+当前 day-run 覆盖矩阵（v3.0.0）：
+- run：`native_cases`、`wuhan_advanced`
+- skill：`location_analysis`、`site_selection`（按 API key 自动决定是否附带 AI 总结）
+- reasoning：`reasoning --reasoner-mode deterministic --report-out data/outputs/reasoning/day_run_reasoning.md`
+- nl：`nl --use-sre --sre-reasoner-mode deterministic --sre-report-out data/outputs/reasoning/day_run_nl_e2e_report.md`
+- memory：`memory status/short/long/search`
+
+关键产物校验：
+- `data/outputs/wuhan_location/grid_location.gpkg`
+- `data/outputs/wuhan_site/site_candidates.gpkg`
+- `data/outputs/wuhan_analysis/grid_clustered.gpkg`
+- `data/outputs/wuhan_analysis/maps/geoclaw_index.png`
+- `data/outputs/reasoning/day_run_reasoning.md`
+- `data/outputs/reasoning/day_run_nl_e2e_report.md`
 
 ## 7. 配置与环境变量
 

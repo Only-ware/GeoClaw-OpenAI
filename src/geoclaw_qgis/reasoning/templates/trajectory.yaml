@@ -1,0 +1,6 @@
+task_type: trajectory_analysis
+methods:
+  - od_extraction
+  - staypoint_detection
+  - trip_segmentation
+  - flow_aggregation

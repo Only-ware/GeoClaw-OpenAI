@@ -24,7 +24,7 @@ fi
 
 cd "${ROOT_DIR}"
 
-echo "[DAY-RUN] 1/8 install geoclaw-openai"
+echo "[DAY-RUN] 1/11 install geoclaw-openai"
 bash scripts/install_geoclaw_openai.sh
 
 USER_BIN="$(${PYTHON_BIN} - <<'PY'
@@ -41,7 +41,7 @@ if [ ! -x "${CLI_BIN}" ]; then
   exit 1
 fi
 
-echo "[DAY-RUN] 2/8 onboard runtime"
+echo "[DAY-RUN] 2/11 onboard runtime"
 onboard_cmd=(
   "${CLI_BIN}" onboard
   --non-interactive
@@ -62,16 +62,16 @@ if [ -f "${HOME}/.geoclaw-openai/env.sh" ]; then
   source "${HOME}/.geoclaw-openai/env.sh"
 fi
 
-echo "[DAY-RUN] 3/8 skill registry"
+echo "[DAY-RUN] 3/11 skill registry"
 "${CLI_BIN}" skill -- --list
 
-echo "[DAY-RUN] 4/8 native cases"
+echo "[DAY-RUN] 4/11 native cases"
 bash scripts/run_native_cases.sh "${BBOX}"
 
-echo "[DAY-RUN] 5/8 wuhan advanced case + maps"
+echo "[DAY-RUN] 5/11 wuhan advanced case + maps"
 bash scripts/run_wuhan_case.sh "${BBOX}"
 
-echo "[DAY-RUN] 6/8 skill: location_analysis"
+echo "[DAY-RUN] 6/11 skill: location_analysis"
 "${CLI_BIN}" skill -- --skill location_analysis --skip-download
 
 if [ "${DAY_RUN_WITH_AI}" = "1" ] || [ "${DAY_RUN_WITH_AI}" = "true" ]; then
@@ -83,20 +83,41 @@ else
 fi
 
 if [ "${ENABLE_AI}" = "1" ]; then
-  echo "[DAY-RUN] 7/8 skill: site_selection + ai summary"
+  echo "[DAY-RUN] 7/11 skill: site_selection + ai summary"
   "${CLI_BIN}" skill -- --skill site_selection --skip-download --with-ai --ai-input "day-run smoke check"
 else
-  echo "[DAY-RUN] 7/8 skill: site_selection (skip ai summary; no real API key)"
+  echo "[DAY-RUN] 7/11 skill: site_selection (skip ai summary; no real API key)"
   "${CLI_BIN}" skill -- --skill site_selection --skip-download
 fi
 
-echo "[DAY-RUN] 8/8 validate key outputs"
+echo "[DAY-RUN] 8/11 reasoning deterministic + report"
+"${CLI_BIN}" reasoning \
+  "武汉地铁站周边商业活跃度分析" \
+  --reasoner-mode deterministic \
+  --report-out "data/outputs/reasoning/day_run_reasoning.md"
+
+echo "[DAY-RUN] 9/11 nl + sre deterministic"
+"${CLI_BIN}" nl \
+  "商场选址分析，优先可复现QGIS流程" \
+  --use-sre \
+  --sre-reasoner-mode deterministic \
+  --sre-report-out "data/outputs/reasoning/day_run_nl_e2e_report.md"
+
+echo "[DAY-RUN] 10/11 memory smoke"
+"${CLI_BIN}" memory status
+"${CLI_BIN}" memory short --limit 2
+"${CLI_BIN}" memory long --limit 2
+"${CLI_BIN}" memory search --query "day-run" --scope all --top-k 3 --min-score 0.0
+
+echo "[DAY-RUN] 11/11 validate key outputs"
 for f in \
   "data/raw/wuhan_osm/study_area.geojson" \
   "data/outputs/wuhan_location/grid_location.gpkg" \
   "data/outputs/wuhan_site/site_candidates.gpkg" \
   "data/outputs/wuhan_analysis/grid_clustered.gpkg" \
-  "data/outputs/wuhan_analysis/maps/geoclaw_index.png"; do
+  "data/outputs/wuhan_analysis/maps/geoclaw_index.png" \
+  "data/outputs/reasoning/day_run_reasoning.md" \
+  "data/outputs/reasoning/day_run_nl_e2e_report.md"; do
   if [ ! -f "${f}" ]; then
     echo "[DAY-RUN][ERROR] missing output: ${f}"
     exit 1

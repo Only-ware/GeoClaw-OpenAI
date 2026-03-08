@@ -1,4 +1,4 @@
-# GeoClaw CLI 安装与 Onboard（v2.4.0）
+# GeoClaw CLI 安装与 Onboard（v3.0.0）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
@@ -107,6 +107,7 @@ geoclaw-openai operator \
 geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
 geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 geoclaw-openai nl "商场选址分析，优先可复现工作流" --execute
+geoclaw-openai nl "商场选址分析，优先可复现QGIS流程" --use-sre --sre-report-out data/outputs/reasoning/nl_e2e_report.md
 
 # TrackIntel 轨迹网络
 geoclaw-openai network \

@@ -1,9 +1,9 @@
-# GeoClaw-OpenAI 框架设计（v2.4.0）
+# GeoClaw-OpenAI 框架设计（v3.0.0）
 
 ## 1. 设计目标
 
 GeoClaw-OpenAI 以 QGIS Processing 为执行底座，形成 GIS 分析、制图、AI 扩展、记忆与自然语言操作的一体化框架。
-v2.4.0 引入 `soul.md + user.md` 双层个性化机制，作为系统行为与用户偏好的统一输入。
+v3.0.0 引入 `soul.md + user.md` 双层个性化机制，作为系统行为与用户偏好的统一输入。
 
 ## 2. 架构分层
 
