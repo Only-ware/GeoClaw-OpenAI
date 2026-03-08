@@ -2,6 +2,29 @@
 
 All notable changes to this project are documented in this file.
 
+## [3.1.0] - 2026-03-08
+
+### Added
+- Added local LLM provider support via Ollama:
+  - `GEOCLAW_AI_PROVIDER=ollama`
+  - default `GEOCLAW_OLLAMA_BASE_URL=http://127.0.0.1:11434/v1`
+  - default `GEOCLAW_OLLAMA_MODEL=llama3.1:8b`
+- Added profile evolution command:
+  - `geoclaw-openai profile evolve --target user|soul|both ...`
+  - supports `--summary`, repeatable `--set KEY=VALUE`, repeatable `--add KEY=V1,V2`.
+- Added natural-language intent routing for profile evolution (NL -> `profile evolve`).
+- Added tests for:
+  - Ollama provider defaults
+  - profile dialogue overrides (user updates + soul safety lock)
+  - CLI parser for `profile evolve`
+  - NL profile intent parsing
+
+### Changed
+- Enforced dialogue-level soul safety policy:
+  - high-risk safety/execution boundary keys remain blocked from dialogue writes.
+- Updated README, technical reference, release notes, and engineering manual for v3.1.0.
+- Bumped runtime/package version to `3.1.0`.
+
 ## [3.0.0-maintenance] - 2026-03-08
 
 ### Added

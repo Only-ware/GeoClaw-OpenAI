@@ -1,5 +1,30 @@
 # GeoClaw-OpenAI Release Notes
 
+## v3.1.0 (2026-03-08)
+
+主要迭代：
+
+1. 本地大模型支持（Ollama）
+   - 新增 provider：`ollama`。
+   - 默认端点：`http://127.0.0.1:11434/v1`。
+   - 默认模型：`llama3.1:8b`。
+   - `onboard` / `config set` 均支持 `--ai-provider ollama`。
+   - 本地模式可无真实 API Key（自动占位 key 兼容配置检查）。
+
+2. Profile 对话更新机制（可控写入）
+   - 新增命令：`geoclaw-openai profile evolve`。
+   - 支持：`--target user|soul|both`、`--summary`、`--set`、`--add`。
+   - `soul` 更新必须显式 `--allow-soul`。
+   - 安全/执行边界相关 key 在代码层强制锁定，无法通过对话改写。
+
+3. 自然语言路由增强
+   - 新增 profile 更新意图识别。
+   - 可将“更新 user.md/soul.md 偏好”的自然语言请求路由到 `profile evolve`。
+
+4. 测试与文档同步
+   - 新增 Ollama 与 profile-evolve 相关单元测试。
+   - README、技术参考、工程说明书同步更新为 v3.1.0。
+
 ## v3.0.0-maintenance (2026-03-08)
 
 主要迭代：

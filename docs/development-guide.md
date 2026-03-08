@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 开发指南（v3.0.0）
+# GeoClaw-OpenAI 开发指南（v3.1.0）
 
 本文档用于后续开发与维护，重点说明工程结构、核心机制、扩展入口与本地验证流程。
 
@@ -62,6 +62,7 @@ AI-Agents/
 - `src/geoclaw_qgis/profile/layers.py`
   - 解析 `soul.md`（系统行为边界）与 `user.md`（长期用户偏好）
   - 会话初始化加载，提供 planner/tool-router/report/memory 的统一上下文
+  - `apply_dialogue_profile_update()` 支持对话摘要驱动的 profile 覆盖写入（含 soul 安全锁）
 - `scripts/geoclaw_case_runner.py`
   - 原生案例统一入口（city/bbox/data-dir）
   - 输出目录强制固定在 `data/outputs`
@@ -69,7 +70,7 @@ AI-Agents/
   - 单算法执行：`--param` / `--param-json` / `--params-file`
   - 执行前做输出安全校验
 - `src/geoclaw_qgis/ai/external_client.py`
-  - OpenAI/Qwen/Gemini provider 统一 client
+  - OpenAI/Qwen/Gemini/Ollama provider 统一 client
   - 自动上下文压缩
 - `src/geoclaw_qgis/memory/store.py`
   - 短期、长期、归档、向量检索
@@ -105,6 +106,7 @@ geoclaw-openai onboard
 source ~/.geoclaw-openai/env.sh
 geoclaw-openai profile init
 geoclaw-openai profile show
+geoclaw-openai profile evolve --target user --summary "偏好中文并优先本地模型" --set preferred_language=Chinese --add preferred_tools=Ollama,QGIS
 ```
 
 ## 6. 开发与验证流程
@@ -143,7 +145,7 @@ bash scripts/run_trackintel_network_demo.sh
 bash scripts/day_run.sh
 ```
 
-当前 day-run 覆盖矩阵（v3.0.0）：
+当前 day-run 覆盖矩阵（v3.1.0）：
 - run：`native_cases`、`wuhan_advanced`
 - skill：`location_analysis`、`site_selection`（按 API key 自动决定是否附带 AI 总结）
 - reasoning：`reasoning --reasoner-mode deterministic --report-out data/outputs/reasoning/day_run_reasoning.md`
@@ -181,7 +183,7 @@ bash scripts/e2e_complex_nl_suite.sh
 - `GEOCLAW_AI_TIMEOUT`
 - `GEOCLAW_AI_MAX_CONTEXT_CHARS`
 
-兼容变量：`GEOCLAW_OPENAI_*`、`GEOCLAW_QWEN_*`、`GEOCLAW_GEMINI_*`。
+兼容变量：`GEOCLAW_OPENAI_*`、`GEOCLAW_QWEN_*`、`GEOCLAW_GEMINI_*`、`GEOCLAW_OLLAMA_*`。
 Profile 变量：`GEOCLAW_SOUL_PATH`、`GEOCLAW_USER_PATH`。
 
 ## 8. 安全策略

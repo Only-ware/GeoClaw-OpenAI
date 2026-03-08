@@ -19,7 +19,7 @@ PDF_OUTPUT = ROOT / "GeoClaw-OpenAI_工程说明书.pdf"
 
 TITLE = "GeoClaw-OpenAI 工程说明书"
 SUBTITLE = "UrbanComp Lab @ China University of Geosciences (Wuhan)"
-VERSION = "3.0.0"
+VERSION = "3.1.0"
 TODAY = dt.date.today().isoformat()
 
 sections: list[tuple[str, list[str]]] = [
@@ -28,7 +28,7 @@ sections: list[tuple[str, list[str]]] = [
         [
             "GeoClaw-OpenAI 面向科研、教学与工程团队，提供可复现的 GIS+AI 全流程能力。",
             "项目目标是将数据获取、空间分析、制图表达、AI 解释、Skill 扩展与任务记忆闭环统一到单一 CLI。",
-            "v3.0.0 形成 SRE+NL+Skill+Memory 的稳定闭环，并支持端到端询问与报告输出。",
+            "v3.1.0 在 SRE+NL+Skill+Memory 稳定闭环基础上，新增本地大模型与 profile 对话演化机制。",
         ],
     ),
     (
@@ -68,15 +68,15 @@ sections: list[tuple[str, list[str]]] = [
         ],
     ),
     (
-        "5. 3.0.0 版本新增重点",
+        "5. 3.1.0 版本新增重点",
         [
-            "5.1 Milestone A-F 收口：SRE 配置化、路由安全、高级推理、外部 reasoner 校验重试完成。",
-            "5.2 day-run 扩展为 11 步回归矩阵，覆盖 run/skill/reasoning/nl(use-sre)/memory。",
-            "5.3 新增 NL 端到端报告输出参数：--sre-report-out / --sre-print-report。",
-            "5.4 新增复杂 NL 端到端回归套件：scripts/e2e_complex_nl_suite.sh（4 场景）。",
-            "5.5 NL 通用参数保留机制：run/network/operator 显式参数在 SRE 路由后仍被保留。",
-            "5.6 data 目录不再忽略，支持新用户直接复现实验样例。",
-            "5.7 版本与文档体系升级到 v3.0.0。",
+            "5.1 新增 Ollama 本地大模型 provider，并接入 onboard/config set 全链路。",
+            "5.2 新增 profile evolve：支持根据对话摘要更新 user.md/soul.md 覆盖层。",
+            "5.3 soul 安全边界字段锁定：重要安全与执行约束不可通过对话改写。",
+            "5.4 新增 NL->profile 路由能力：自然语言可触发 profile 演化命令。",
+            "5.5 day-run 与单元测试矩阵扩展，覆盖 profile evolve 与 provider 兼容性。",
+            "5.6 data 目录持续跟踪，支持新用户直接复现实验样例。",
+            "5.7 版本与文档体系升级到 v3.1.0。",
         ],
     ),
     (
@@ -85,12 +85,13 @@ sections: list[tuple[str, list[str]]] = [
             "6.1 环境检查：bash scripts/check_local_env.sh。",
             "6.2 安装与初始化：bash scripts/install_geoclaw_openai.sh && geoclaw-openai onboard。",
             "6.3 初始化 profile：geoclaw-openai profile init && geoclaw-openai profile show。",
-            "6.4 标准分析：geoclaw-openai run --case native_cases --city \"武汉市\"。",
-            "6.5 端到端询问+报告：geoclaw-openai nl \"商场选址分析\" --use-sre --sre-report-out data/outputs/reasoning/nl_report.md。",
-            "6.6 Skill 安全评估：geoclaw-openai skill-registry assess --spec-file <skill.json>。",
-            "6.7 通过评估后注册：geoclaw-openai skill-registry register --spec-file <skill.json> --confirm。",
-            "6.8 回归测试：python3 -m unittest discover -s src/geoclaw_qgis/tests。",
-            "6.9 复杂端到端测试：bash scripts/e2e_complex_nl_suite.sh。",
+            "6.4 对话演化 profile：geoclaw-openai profile evolve --target user --summary \"...\" --set preferred_language=Chinese。",
+            "6.5 标准分析：geoclaw-openai run --case native_cases --city \"武汉市\"。",
+            "6.6 端到端询问+报告：geoclaw-openai nl \"商场选址分析\" --use-sre --sre-report-out data/outputs/reasoning/nl_report.md。",
+            "6.7 Skill 安全评估：geoclaw-openai skill-registry assess --spec-file <skill.json>。",
+            "6.8 通过评估后注册：geoclaw-openai skill-registry register --spec-file <skill.json> --confirm。",
+            "6.9 回归测试：python3 -m unittest discover -s src/geoclaw_qgis/tests。",
+            "6.10 复杂端到端测试：bash scripts/e2e_complex_nl_suite.sh。",
         ],
     ),
     (

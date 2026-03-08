@@ -18,6 +18,31 @@ class TestCLIParser(unittest.TestCase):
         self.assertEqual(args.command, "reasoning")
         self.assertEqual(args.query, ["测试任务"])
 
+    def test_profile_evolve_command_exists(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "profile",
+                "evolve",
+                "--target",
+                "both",
+                "--allow-soul",
+                "--summary",
+                "同步长期偏好",
+                "--set",
+                "preferred_language=Chinese",
+                "--add",
+                "preferred_tools=QGIS,Ollama",
+            ]
+        )
+        self.assertEqual(args.command, "profile")
+        self.assertEqual(args.profile_cmd, "evolve")
+        self.assertEqual(args.target, "both")
+        self.assertTrue(args.allow_soul)
+        self.assertEqual(args.summary, "同步长期偏好")
+        self.assertIn("preferred_language=Chinese", args.set_items)
+        self.assertIn("preferred_tools=QGIS,Ollama", args.add_items)
+
     def test_nl_sre_flags(self) -> None:
         parser = build_parser()
         args = parser.parse_args(

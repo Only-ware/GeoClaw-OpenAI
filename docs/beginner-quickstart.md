@@ -37,10 +37,12 @@ source ~/.geoclaw-openai/env.sh
 
 `onboard` 会引导你配置：
 
-- AI provider（OpenAI / Qwen / Gemini）
+- AI provider（OpenAI / Qwen / Gemini / Ollama）
 - API Key
 - 默认模型
 - 默认 bbox
+
+如使用本地模型，推荐选 `ollama`，默认端点为 `http://127.0.0.1:11434/v1`。
 
 ## 4. 第一条命令（端到端）
 

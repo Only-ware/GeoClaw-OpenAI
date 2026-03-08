@@ -26,7 +26,12 @@ from geoclaw_qgis.config import (
 )
 from geoclaw_qgis.memory import TaskMemoryStore
 from geoclaw_qgis.nl import NLPlan, parse_nl_query
-from geoclaw_qgis.profile import SessionProfile, ensure_profile_layers, load_session_profile
+from geoclaw_qgis.profile import (
+    SessionProfile,
+    apply_dialogue_profile_update,
+    ensure_profile_layers,
+    load_session_profile,
+)
 from geoclaw_qgis.project_info import LAB_AFFILIATION, PROJECT_NAME, PROJECT_VERSION
 from geoclaw_qgis.reasoning import run_spatial_reasoning
 from geoclaw_qgis.reasoning.data_catalog_adapter import (
@@ -55,6 +60,10 @@ AI_PROVIDER_PRESETS: dict[str, dict[str, str]] = {
     "gemini": {
         "base_url": "https://generativelanguage.googleapis.com/v1beta/openai",
         "model": "gemini-flash-latest",
+    },
+    "ollama": {
+        "base_url": "http://127.0.0.1:11434/v1",
+        "model": "llama3.1:8b",
     },
 }
 _SESSION_PROFILE: SessionProfile | None = None
@@ -178,11 +187,12 @@ def cmd_onboard(args: argparse.Namespace) -> int:
         or os.environ.get("GEOCLAW_OPENAI_API_KEY", "").strip()
         or os.environ.get("GEOCLAW_QWEN_API_KEY", "").strip()
         or os.environ.get("GEOCLAW_GEMINI_API_KEY", "").strip()
+        or os.environ.get("GEOCLAW_OLLAMA_API_KEY", "").strip()
     )
 
     if not args.non_interactive:
         print(f"GeoClaw-OpenAI home: {geoclaw_home()}")
-        ai_provider = ask_value("AI Provider (openai/qwen/gemini)", ai_provider).strip().lower() or ai_provider
+        ai_provider = ask_value("AI Provider (openai/qwen/gemini/ollama)", ai_provider).strip().lower() or ai_provider
         if ai_provider not in AI_PROVIDER_PRESETS:
             raise ValueError(f"unsupported AI provider: {ai_provider}")
         provider_defaults = AI_PROVIDER_PRESETS[ai_provider]
@@ -213,6 +223,8 @@ def cmd_onboard(args: argparse.Namespace) -> int:
         if not detected_qgis:
             detected_qgis = args.qgis_process or runtime.get("qgis_process", "")
 
+    if ai_provider == "ollama" and not api_key:
+        api_key = "ollama-local"
     if not api_key:
         raise ValueError("AI API key is required. Use --api-key or run interactive onboard.")
 
@@ -257,6 +269,11 @@ def cmd_onboard(args: argparse.Namespace) -> int:
         env_values["GEOCLAW_GEMINI_BASE_URL"] = api_base_url
         env_values["GEOCLAW_GEMINI_API_KEY"] = api_key
         env_values["GEOCLAW_GEMINI_MODEL"] = ai_model
+    if ai_provider == "ollama":
+        env_values["GEOCLAW_OLLAMA_BASE_URL"] = api_base_url
+        env_values["GEOCLAW_OLLAMA_MODEL"] = ai_model
+        if api_key:
+            env_values["GEOCLAW_OLLAMA_API_KEY"] = api_key
     if detected_qgis:
         env_values["GEOCLAW_OPENAI_QGIS_PROCESS"] = detected_qgis
 
@@ -353,8 +370,11 @@ def cmd_config_set(args: argparse.Namespace) -> int:
         or env_values.get("GEOCLAW_OPENAI_API_KEY", "").strip()
         or env_values.get("GEOCLAW_QWEN_API_KEY", "").strip()
         or env_values.get("GEOCLAW_GEMINI_API_KEY", "").strip()
+        or env_values.get("GEOCLAW_OLLAMA_API_KEY", "").strip()
     )
     api_key = str(args.api_key or existing_api_key).strip()
+    if ai_provider == "ollama" and not api_key:
+        api_key = "ollama-local"
 
     env_values.update(
         {
@@ -384,6 +404,11 @@ def cmd_config_set(args: argparse.Namespace) -> int:
         env_values["GEOCLAW_GEMINI_MODEL"] = ai_model
         if api_key:
             env_values["GEOCLAW_GEMINI_API_KEY"] = api_key
+    if ai_provider == "ollama":
+        env_values["GEOCLAW_OLLAMA_BASE_URL"] = ai_base_url
+        env_values["GEOCLAW_OLLAMA_MODEL"] = ai_model
+        if api_key:
+            env_values["GEOCLAW_OLLAMA_API_KEY"] = api_key
 
     config_file = write_config(payload)
     env_file = write_env(env_values)
@@ -432,6 +457,99 @@ def cmd_profile_show(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
     session = get_session_profile(force_reload=bool(args.reload))
     print(json.dumps(session.to_dict(), ensure_ascii=False, indent=2))
+    return 0
+
+
+def _parse_set_pairs(values: list[str]) -> dict[str, str]:
+    payload: dict[str, str] = {}
+    for raw in values:
+        item = str(raw or "").strip()
+        if not item:
+            continue
+        if "=" not in item:
+            raise ValueError(f"invalid --set item: {item}. expected KEY=VALUE")
+        key, value = item.split("=", 1)
+        k = key.strip().lower()
+        v = value.strip()
+        if not k:
+            raise ValueError(f"invalid --set item: {item}. empty key")
+        if not v:
+            raise ValueError(f"invalid --set item: {item}. empty value")
+        payload[k] = v
+    return payload
+
+
+def _parse_add_pairs(values: list[str]) -> dict[str, list[str]]:
+    payload: dict[str, list[str]] = {}
+    for raw in values:
+        item = str(raw or "").strip()
+        if not item:
+            continue
+        if "=" not in item:
+            raise ValueError(f"invalid --add item: {item}. expected KEY=VALUE1,VALUE2")
+        key, value = item.split("=", 1)
+        k = key.strip().lower()
+        if not k:
+            raise ValueError(f"invalid --add item: {item}. empty key")
+        text = value.strip()
+        if not text:
+            raise ValueError(f"invalid --add item: {item}. empty value")
+        if ";" in text:
+            items = [x.strip() for x in text.split(";")]
+        elif "|" in text:
+            items = [x.strip() for x in text.split("|")]
+        else:
+            items = [x.strip() for x in text.split(",")]
+        clean = [x for x in items if x]
+        if not clean:
+            raise ValueError(f"invalid --add item: {item}. empty parsed values")
+        payload[k] = clean
+    return payload
+
+
+def cmd_profile_evolve(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    set_values = _parse_set_pairs(list(args.set_items or []))
+    add_values = _parse_add_pairs(list(args.add_items or []))
+    summary = str(args.summary or "").strip()
+
+    target = str(args.target or "user").strip().lower()
+    targets = ["user", "soul"] if target == "both" else [target]
+    if "soul" in targets and not bool(args.allow_soul):
+        raise ValueError(
+            "Updating soul.md from dialogue requires --allow-soul. "
+            "Safety/execution boundary keys remain locked regardless."
+        )
+
+    results: list[dict[str, object]] = []
+    for current in targets:
+        results.append(
+            apply_dialogue_profile_update(
+                target=current,
+                summary=summary,
+                set_values=set_values,
+                add_values=add_values,
+                workspace_root=resolve_workspace_root(),
+                dry_run=bool(args.dry_run),
+            )
+        )
+
+    profile_payload: dict[str, object] = {}
+    if not bool(args.dry_run):
+        profile_payload = get_session_profile(force_reload=True).to_dict()
+
+    print(
+        json.dumps(
+            {
+                "target": target,
+                "dry_run": bool(args.dry_run),
+                "updates": results,
+                "profile": profile_payload,
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )
     return 0
 
 
@@ -1396,8 +1514,8 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     onboard = sub.add_parser("onboard", help="setup GeoClaw runtime and API parameters")
-    onboard.add_argument("--api-key", default="", help="AI API key (OpenAI/Qwen/Gemini)")
-    onboard.add_argument("--ai-provider", default="", help="AI provider: openai or qwen or gemini")
+    onboard.add_argument("--api-key", default="", help="AI API key (OpenAI/Qwen/Gemini/Ollama)")
+    onboard.add_argument("--ai-provider", default="", help="AI provider: openai or qwen or gemini or ollama")
     onboard.add_argument("--ai-base-url", default="", help="AI base URL")
     onboard.add_argument("--ai-model", default="", help="AI model name")
     onboard.add_argument("--qgis-process", default="", help="qgis_process path")
@@ -1413,7 +1531,7 @@ def build_parser() -> argparse.ArgumentParser:
     cfg_show.set_defaults(func=cmd_config_show)
     cfg_set = cfg_sub.add_parser("set", help="update AI/model/runtime settings")
     cfg_set.add_argument("--api-key", default="", help="AI API key (optional)")
-    cfg_set.add_argument("--ai-provider", default="", help="openai | qwen | gemini")
+    cfg_set.add_argument("--ai-provider", default="", help="openai | qwen | gemini | ollama")
     cfg_set.add_argument("--ai-base-url", default="", help="AI base URL")
     cfg_set.add_argument("--ai-model", default="", help="AI model name")
     cfg_set.add_argument("--qgis-process", default="", help="qgis_process path")
@@ -1441,6 +1559,40 @@ def build_parser() -> argparse.ArgumentParser:
     profile_show = profile_sub.add_parser("show", help="show loaded profile layers")
     profile_show.add_argument("--reload", action="store_true", help="force reload from files")
     profile_show.set_defaults(func=cmd_profile_show)
+    profile_evolve = profile_sub.add_parser(
+        "evolve",
+        help="append dialogue summary and update user.md/soul.md overrides (non-safety keys)",
+    )
+    profile_evolve.add_argument(
+        "--target",
+        default="user",
+        choices=["user", "soul", "both"],
+        help="target layer to update",
+    )
+    profile_evolve.add_argument(
+        "--allow-soul",
+        action="store_true",
+        help="required when target includes soul",
+    )
+    profile_evolve.add_argument("--summary", default="", help="dialogue summary for profile update trace")
+    profile_evolve.add_argument(
+        "--set",
+        dest="set_items",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help="set one scalar/list key (repeatable)",
+    )
+    profile_evolve.add_argument(
+        "--add",
+        dest="add_items",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE1,VALUE2",
+        help="append list values (repeatable)",
+    )
+    profile_evolve.add_argument("--dry-run", action="store_true", help="preview update without writing files")
+    profile_evolve.set_defaults(func=cmd_profile_evolve)
 
     skill = sub.add_parser("skill", help="proxy to scripts/geoclaw_skill_runner.py")
     skill.add_argument("extra", nargs=argparse.REMAINDER, help="args passed to skill runner")

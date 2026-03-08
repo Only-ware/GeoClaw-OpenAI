@@ -117,6 +117,47 @@ Preferred language: Chinese or English
 
 _HEADER_RE = re.compile(r"^#{2,3}\s+(.+?)\s*$")
 _BULLET_RE = re.compile(r"^(?:[-*]|\d+\.)\s+(.*)$")
+_KV_RE = re.compile(r"^([a-zA-Z0-9_]+)\s*:\s*(.+)$")
+
+_USER_OVERRIDE_SECTION = "Dialogue Overrides"
+_SOUL_OVERRIDE_SECTION = "Dialogue Overrides (Non-Safety)"
+_USER_OVERRIDE_ALIASES = ("dialogue overrides", "conversation overrides", "对话覆盖")
+_SOUL_OVERRIDE_ALIASES = (
+    "dialogue overrides (non-safety)",
+    "conversation overrides (non-safety)",
+    "对话覆盖（非安全）",
+)
+
+_USER_OVERRIDE_SCHEMA: dict[str, str] = {
+    "role": "scalar",
+    "domain_background": "scalar",
+    "preferred_language": "scalar",
+    "preferred_tone": "scalar",
+    "preferred_tools": "list",
+    "output_preferences": "list",
+    "reproducibility_expectations": "list",
+    "privacy_preferences": "list",
+    "common_project_contexts": "list",
+    "long_term_constraints": "list",
+    "workflow_habits": "list",
+}
+
+_SOUL_OVERRIDE_SCHEMA: dict[str, str] = {
+    "mission": "scalar",
+    "reasoning_philosophy": "scalar",
+    "spatial_reasoning_guidelines": "list",
+    "output_quality_standards": "list",
+    "collaboration_philosophy": "list",
+}
+
+_SOUL_LOCKED_KEYS = {
+    "safety_boundaries",
+    "execution_hierarchy",
+    "data_handling_rules",
+    "geospatial_principles",
+    "truthfulness_rules",
+    "reproducibility_requirements",
+}
 
 
 @dataclass(frozen=True)
@@ -288,6 +329,108 @@ def _section_items(sections: dict[str, str], *aliases: str) -> list[str]:
     return unique
 
 
+def _dedupe_list(items: list[str]) -> list[str]:
+    unique: list[str] = []
+    seen: set[str] = set()
+    for item in items:
+        text = str(item).strip()
+        if not text:
+            continue
+        key = text.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(text)
+    return unique
+
+
+def _parse_list_value(value: str) -> list[str]:
+    text = str(value or "").strip()
+    if not text:
+        return []
+    if ";" in text:
+        parts = [x.strip() for x in text.split(";")]
+    elif "|" in text:
+        parts = [x.strip() for x in text.split("|")]
+    else:
+        parts = [x.strip() for x in text.split(",")]
+    return _dedupe_list([x for x in parts if x])
+
+
+def _extract_override_map(sections: dict[str, str], aliases: tuple[str, ...]) -> dict[str, str]:
+    text = _section_text(sections, *aliases)
+    if not text:
+        return {}
+    out: dict[str, str] = {}
+    for raw in text.splitlines():
+        line = raw.strip()
+        if not line or line.startswith("#"):
+            continue
+        match = _KV_RE.match(line)
+        if not match:
+            continue
+        key = match.group(1).strip().lower()
+        value = match.group(2).strip()
+        if key and value:
+            out[key] = value
+    return out
+
+
+def _normalize_override_values(
+    overrides: dict[str, str],
+    schema: dict[str, str],
+) -> tuple[dict[str, str], dict[str, list[str]]]:
+    scalar_values: dict[str, str] = {}
+    list_values: dict[str, list[str]] = {}
+    for key, raw in overrides.items():
+        if key not in schema:
+            continue
+        mode = schema[key]
+        if mode == "list":
+            items = _parse_list_value(raw)
+            if items:
+                list_values[key] = items
+            continue
+        value = str(raw).strip()
+        if value:
+            scalar_values[key] = value
+    return scalar_values, list_values
+
+
+def _upsert_top_level_section(markdown: str, *, title: str, aliases: tuple[str, ...], body_lines: list[str]) -> str:
+    lines = markdown.splitlines()
+    heading_pattern = re.compile(r"^##\s+(.+?)\s*$")
+    wanted = {title.strip().lower(), *[x.strip().lower() for x in aliases]}
+
+    start = -1
+    for idx, raw in enumerate(lines):
+        match = heading_pattern.match(raw.strip())
+        if not match:
+            continue
+        if match.group(1).strip().lower() in wanted:
+            start = idx
+            break
+
+    if start < 0:
+        out = list(lines)
+        if out and out[-1].strip():
+            out.append("")
+        out.append(f"## {title}")
+        out.append("")
+        out.extend(body_lines)
+        out.append("")
+        return "\n".join(out).strip() + "\n"
+
+    end = len(lines)
+    for idx in range(start + 1, len(lines)):
+        if heading_pattern.match(lines[idx].strip()):
+            end = idx
+            break
+
+    out = lines[: start + 1] + [""] + body_lines + [""] + lines[end:]
+    return "\n".join(out).strip() + "\n"
+
+
 def _extract_kv(text: str, key: str, default: str = "") -> str:
     pattern = re.compile(rf"^{re.escape(key)}\s*:\s*(.+)$", re.IGNORECASE | re.MULTILINE)
     match = pattern.search(text)
@@ -314,6 +457,14 @@ def _parse_soul(markdown: str) -> SoulConfig:
     repro = [x for x in (core + data_rules + output_std) if "reproduc" in x.lower() or "trace" in x.lower()]
     truth = [x for x in (core + safety) if any(k in x.lower() for k in ("uncertain", "truth", "fabricat", "assumption"))]
     reasoning = " ".join(core[:2]).strip() or "Prefer structured, reproducible geospatial workflows."
+
+    soul_overrides = _extract_override_map(sections, _SOUL_OVERRIDE_ALIASES)
+    soul_override_scalars, soul_override_lists = _normalize_override_values(soul_overrides, _SOUL_OVERRIDE_SCHEMA)
+    mission = soul_override_scalars.get("mission", mission)
+    reasoning = soul_override_scalars.get("reasoning_philosophy", reasoning)
+    spatial = soul_override_lists.get("spatial_reasoning_guidelines", spatial)
+    output_std = soul_override_lists.get("output_quality_standards", output_std)
+    collab = soul_override_lists.get("collaboration_philosophy", collab)
 
     return SoulConfig(
         identity=identity,
@@ -351,6 +502,20 @@ def _parse_user(markdown: str) -> UserProfile:
     contexts = _section_items(sections, "common project contexts")
     constraints = _section_items(sections, "long-term constraints and habits")
     habits = _section_items(sections, "collaboration expectations", "technical level")
+
+    user_overrides = _extract_override_map(sections, _USER_OVERRIDE_ALIASES)
+    user_override_scalars, user_override_lists = _normalize_override_values(user_overrides, _USER_OVERRIDE_SCHEMA)
+    role = user_override_scalars.get("role", role)
+    domain = user_override_scalars.get("domain_background", domain)
+    preferred_language = user_override_scalars.get("preferred_language", preferred_language)
+    preferred_tone = user_override_scalars.get("preferred_tone", preferred_tone)
+    preferred_tools = user_override_lists.get("preferred_tools", preferred_tools)
+    output_preferences = user_override_lists.get("output_preferences", output_preferences)
+    reproducibility = user_override_lists.get("reproducibility_expectations", reproducibility)
+    privacy = user_override_lists.get("privacy_preferences", privacy)
+    contexts = user_override_lists.get("common_project_contexts", contexts)
+    constraints = user_override_lists.get("long_term_constraints", constraints)
+    habits = user_override_lists.get("workflow_habits", habits)
 
     return UserProfile(
         role=role,
@@ -453,3 +618,108 @@ def load_session_profile(workspace_root: Path | None = None, *, force_reload: bo
     )
     _PROFILE_CACHE = profile
     return profile
+
+
+def apply_dialogue_profile_update(
+    *,
+    target: str,
+    summary: str = "",
+    set_values: dict[str, str] | None = None,
+    add_values: dict[str, list[str]] | None = None,
+    workspace_root: Path | None = None,
+    dry_run: bool = False,
+) -> dict[str, Any]:
+    target_clean = str(target or "").strip().lower()
+    if target_clean not in {"user", "soul"}:
+        raise ValueError("target must be one of: user, soul")
+
+    root = (workspace_root or Path.cwd()).resolve()
+    session = load_session_profile(root, force_reload=True)
+    file_path = Path(session.user_path if target_clean == "user" else session.soul_path).resolve()
+    markdown = _read_text_or_default(file_path, DEFAULT_USER_TEMPLATE if target_clean == "user" else DEFAULT_SOUL_TEMPLATE)
+    sections = _split_sections(markdown)
+
+    schema = _USER_OVERRIDE_SCHEMA if target_clean == "user" else _SOUL_OVERRIDE_SCHEMA
+    aliases = _USER_OVERRIDE_ALIASES if target_clean == "user" else _SOUL_OVERRIDE_ALIASES
+    title = _USER_OVERRIDE_SECTION if target_clean == "user" else _SOUL_OVERRIDE_SECTION
+    existing_map = _extract_override_map(sections, aliases)
+
+    set_values = dict(set_values or {})
+    add_values = dict(add_values or {})
+    blocked_keys: list[str] = []
+    ignored_keys: list[str] = []
+
+    merged_scalars, merged_lists = _normalize_override_values(existing_map, schema)
+
+    for raw_key, raw_value in set_values.items():
+        key = str(raw_key).strip().lower()
+        value = str(raw_value).strip()
+        if not key:
+            continue
+        if target_clean == "soul" and key in _SOUL_LOCKED_KEYS:
+            blocked_keys.append(key)
+            continue
+        if key not in schema:
+            ignored_keys.append(key)
+            continue
+        if schema[key] == "list":
+            merged_lists[key] = _parse_list_value(value)
+        else:
+            merged_scalars[key] = value
+
+    for raw_key, raw_items in add_values.items():
+        key = str(raw_key).strip().lower()
+        if not key:
+            continue
+        if target_clean == "soul" and key in _SOUL_LOCKED_KEYS:
+            blocked_keys.append(key)
+            continue
+        if key not in schema:
+            ignored_keys.append(key)
+            continue
+        if schema[key] != "list":
+            ignored_keys.append(key)
+            continue
+        current = list(merged_lists.get(key, []))
+        current.extend([str(x).strip() for x in (raw_items or []) if str(x).strip()])
+        merged_lists[key] = _dedupe_list(current)
+
+    now = dt.datetime.now(dt.timezone.utc).isoformat()
+    body_lines = [f"updated_at: {now}"]
+    summary_text = " ".join(summary.split()).strip()
+    if summary_text:
+        body_lines.append(f"last_summary: {summary_text}")
+
+    for key in sorted(schema.keys()):
+        mode = schema[key]
+        if mode == "list":
+            values = merged_lists.get(key, [])
+            if values:
+                body_lines.append(f"{key}: {'; '.join(values)}")
+        else:
+            value = merged_scalars.get(key, "").strip()
+            if value:
+                body_lines.append(f"{key}: {value}")
+
+    updated_markdown = _upsert_top_level_section(
+        markdown,
+        title=title,
+        aliases=aliases,
+        body_lines=body_lines,
+    )
+
+    changed = updated_markdown.strip() != markdown.strip()
+    if changed and not dry_run:
+        file_path.write_text(updated_markdown, encoding="utf-8")
+
+    return {
+        "target": target_clean,
+        "file": str(file_path),
+        "updated_at": now,
+        "changed": bool(changed),
+        "dry_run": bool(dry_run),
+        "blocked_keys": _dedupe_list(blocked_keys),
+        "ignored_keys": _dedupe_list(ignored_keys),
+        "set_keys": sorted([str(k).strip().lower() for k in set_values.keys() if str(k).strip()]),
+        "add_keys": sorted([str(k).strip().lower() for k in add_values.keys() if str(k).strip()]),
+    }

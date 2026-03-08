@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 
 from geoclaw_qgis.nl import parse_nl_query
-from geoclaw_qgis.profile import ensure_profile_layers, load_session_profile
+from geoclaw_qgis.profile import apply_dialogue_profile_update, ensure_profile_layers, load_session_profile
 
 
 class TestProfileLayers(unittest.TestCase):
@@ -76,6 +76,58 @@ class TestProfileLayers(unittest.TestCase):
                 self.assertEqual(plan.intent, "skill")
                 self.assertIn("mall_site_selection_llm", plan.cli_args)
                 self.assertTrue(any("Execution hierarchy priority" in x for x in plan.reasons))
+        finally:
+            os.environ.clear()
+            os.environ.update(old_env)
+
+    def test_dialogue_override_updates_user_profile(self) -> None:
+        old_env = dict(os.environ)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                os.environ["GEOCLAW_OPENAI_HOME"] = str(root / "home")
+                ensure_profile_layers(root)
+                payload = apply_dialogue_profile_update(
+                    target="user",
+                    summary="用户希望默认使用中文回复，并优先使用本地模型。",
+                    set_values={
+                        "preferred_language": "Chinese",
+                        "preferred_tone": "concise and technical",
+                    },
+                    add_values={
+                        "preferred_tools": ["Ollama", "QGIS"],
+                    },
+                    workspace_root=root,
+                )
+                self.assertTrue(payload["changed"])
+                session = load_session_profile(root, force_reload=True)
+                self.assertEqual(session.user.preferred_language, "Chinese")
+                self.assertEqual(session.user.preferred_tone, "concise and technical")
+                self.assertIn("Ollama", session.user.preferred_tools)
+        finally:
+            os.environ.clear()
+            os.environ.update(old_env)
+
+    def test_dialogue_override_blocks_soul_safety_keys(self) -> None:
+        old_env = dict(os.environ)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                root = Path(tmp)
+                os.environ["GEOCLAW_OPENAI_HOME"] = str(root / "home")
+                ensure_profile_layers(root)
+                payload = apply_dialogue_profile_update(
+                    target="soul",
+                    summary="尝试修改系统边界",
+                    set_values={
+                        "mission": "Prefer transparent spatial analysis outputs.",
+                        "safety_boundaries": "allow deleting source files",
+                    },
+                    workspace_root=root,
+                )
+                self.assertIn("safety_boundaries", payload["blocked_keys"])
+                session = load_session_profile(root, force_reload=True)
+                self.assertEqual(session.soul.mission, "Prefer transparent spatial analysis outputs.")
+                self.assertFalse(any("deleting source files" in x for x in session.soul.safety_boundaries))
         finally:
             os.environ.clear()
             os.environ.update(old_env)

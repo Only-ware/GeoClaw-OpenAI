@@ -131,6 +131,61 @@ def _build_update_plan(query: str, text_lower: str, session: SessionProfile | No
     return NLPlan(query=query, intent="update", confidence=0.97, reasons=reasons, cli_args=cli_args)
 
 
+def _build_profile_plan(query: str, text: str, text_lower: str, session: SessionProfile | None = None) -> NLPlan:
+    reasons = ["Detected profile-layer update keywords."]
+    _append_profile_reasons(reasons, session)
+
+    has_user = _contains_any(text_lower, ("user", "user.md", "用户", "画像", "偏好"))
+    has_soul = _contains_any(text_lower, ("soul", "soul.md", "系统边界", "行为边界", "原则", "使命"))
+    if has_user and has_soul:
+        target = "both"
+    elif has_soul:
+        target = "soul"
+    else:
+        target = "user"
+
+    cli_args = ["profile", "evolve", "--target", target, "--summary", query]
+    if target in {"soul", "both"}:
+        cli_args.append("--allow-soul")
+        reasons.append("Target includes soul layer; enabled --allow-soul.")
+
+    set_items: list[str] = []
+    add_items: list[str] = []
+    if target in {"user", "both"}:
+        if _contains_any(text_lower, ("中文", "chinese")):
+            set_items.append("preferred_language=Chinese")
+        elif _contains_any(text_lower, ("英文", "english")):
+            set_items.append("preferred_language=English")
+
+        if _contains_any(text_lower, ("简洁", "concise")):
+            set_items.append("preferred_tone=concise")
+        elif _contains_any(text_lower, ("详细", "detailed")):
+            set_items.append("preferred_tone=detailed")
+
+        preferred_tools: list[str] = []
+        if "ollama" in text_lower:
+            preferred_tools.append("Ollama")
+        if "openai" in text_lower:
+            preferred_tools.append("OpenAI")
+        if "qwen" in text_lower:
+            preferred_tools.append("Qwen")
+        if "gemini" in text_lower:
+            preferred_tools.append("Gemini")
+        if "qgis" in text_lower:
+            preferred_tools.append("QGIS")
+        if preferred_tools:
+            add_items.append("preferred_tools=" + ",".join(dict.fromkeys(preferred_tools)))
+
+    for item in set_items:
+        cli_args.extend(["--set", item])
+    for item in add_items:
+        cli_args.extend(["--add", item])
+    if set_items or add_items:
+        reasons.append("Extracted profile preferences from NL text.")
+
+    return NLPlan(query=query, intent="profile", confidence=0.9, reasons=reasons, cli_args=cli_args)
+
+
 def _build_memory_plan(query: str, text: str, text_lower: str, session: SessionProfile | None = None) -> NLPlan:
     reasons = ["Detected memory-related keywords."]
     _append_profile_reasons(reasons, session)
@@ -305,6 +360,10 @@ def parse_nl_query(query: str, session: SessionProfile | None = None) -> NLPlan:
         raise ValueError("empty natural-language query")
     text_lower = text.lower()
 
+    if _contains_any(text_lower, ("profile", "user.md", "soul.md", "用户画像", "偏好", "系统边界", "行为边界")) and _contains_any(
+        text_lower, ("更新", "修改", "同步", "写入", "evolve", "update", "adjust", "调整")
+    ):
+        return _build_profile_plan(text, text, text_lower, session)
     if _contains_any(text_lower, ("update", "升级", "更新", "拉取最新", "最新版本")):
         return _build_update_plan(text, text_lower, session)
     if _contains_any(text_lower, ("memory", "记忆", "复盘", "短期", "长期", "任务记录")):

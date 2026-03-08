@@ -1,8 +1,8 @@
-# GeoClaw Soul/User 分层说明（v3.0.0）
+# GeoClaw Soul/User 分层说明（v3.1.0）
 
 ## 1. 设计目标
 
-GeoClaw v3.0.0 引入双层长期配置：
+GeoClaw v3.1.0 引入双层长期配置：
 
 - `soul.md`：系统级身份、推理原则、执行边界（高优先级）
 - `user.md`：用户长期画像与偏好（软个性化）
@@ -36,6 +36,16 @@ geoclaw-openai profile init
 
 ```bash
 geoclaw-openai profile show
+```
+
+按对话更新 profile：
+
+```bash
+# 更新 user 偏好
+geoclaw-openai profile evolve --target user --summary "偏好中文和简洁技术说明" --set preferred_language=Chinese
+
+# 更新 soul 非安全字段（需显式确认）
+geoclaw-openai profile evolve --target soul --allow-soul --summary "补充协作原则" --set mission="Help users perform reliable geospatial analysis."
 ```
 
 ## 3. 解析输出（结构化）
@@ -76,3 +86,4 @@ geoclaw-openai profile show
 - `soul.md` 优先级高于 `user.md`。
 - `user.md` 不能覆盖安全边界与系统执行约束。
 - 该层用于长期配置，不用于临时任务状态记录。
+- `soul.md` 的安全边界相关字段在代码层锁定，不允许通过 `profile evolve` 或自然语言路由改写。

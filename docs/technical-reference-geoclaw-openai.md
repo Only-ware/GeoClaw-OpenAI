@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 技术参考（科研与团队版，v3.0.0）
+# GeoClaw-OpenAI 技术参考（科研与团队版，v3.1.0）
 
 更新时间：2026-03-08（Asia/Shanghai）  
 机构：UrbanComp Lab @ China University of Geosciences (Wuhan)
@@ -47,7 +47,7 @@ AI-Agents/
 
 - 配置：`onboard`、`config show`、`config set`、`env`
 - 执行：`run`、`operator`、`network`、`skill`
-- profile：`profile init/show`
+- profile：`profile init/show/evolve`
 - 记忆：`memory status/short/long/review/archive/search`
 - 智能入口：`nl`
 - 更新：`update`
@@ -82,10 +82,12 @@ AI-Agents/
 
 入口：`src/geoclaw_qgis/ai/external_client.py`
 
-- provider：`openai` / `qwen` / `gemini`
+- provider：`openai` / `qwen` / `gemini` / `ollama`
 - 协议：OpenAI-compatible `/chat/completions`
 - 长上下文自动压缩：`src/geoclaw_qgis/ai/context.py`
 - 压缩阈值：`GEOCLAW_AI_MAX_CONTEXT_CHARS`（默认 `12000`）
+- Ollama 默认：`base_url=http://127.0.0.1:11434/v1`、`model=llama3.1:8b`
+- Ollama 在本地模式下可不提供真实 API Key（CLI 自动写入占位 key）
 
 ### 4.4 Memory：短期/长期/归档/检索
 
@@ -103,6 +105,10 @@ AI-Agents/
 - `soul.md`：系统身份、地理推理原则、执行边界（系统级高优先级）
 - `user.md`：用户长期画像、偏好、协作习惯（软个性化层）
 - 会话启动自动加载并解析为结构化对象，供 planner/tool-router/report/memory 统一消费
+- 对话更新入口：`profile evolve`
+  - 支持 `--target user|soul|both`
+  - `soul` 更新必须显式 `--allow-soul`
+  - 安全与执行边界相关字段在代码层锁定，不允许通过对话改写
 
 ### 4.6 安全策略
 
@@ -118,6 +124,7 @@ AI-Agents/
 
 - 将自然语言请求解析为 CLI 参数计划（`NLPlan`）
 - 默认预览，`--execute` 执行
+- 支持 profile 更新意图：自然语言可路由到 `profile evolve`
 - 在 `cmd_nl` 增加通用约束保留层：若用户显式给出关键参数，SRE 路由后会二次约束，防止参数丢失或错误改写
   - `run`：保留 `--city/--bbox/--data-dir/--top-n/--with-maps/...`
   - `network`：保留 `--pfs-csv/--out-dir/...`
@@ -151,6 +158,7 @@ AI-Agents/
 - OpenAI：`GEOCLAW_OPENAI_*`
 - Qwen：`GEOCLAW_QWEN_*`
 - Gemini：`GEOCLAW_GEMINI_*`
+- Ollama：`GEOCLAW_OLLAMA_*`
 
 ## 6. 核心命令示例
 
@@ -160,6 +168,7 @@ geoclaw-openai onboard
 source ~/.geoclaw-openai/env.sh
 geoclaw-openai profile init
 geoclaw-openai profile show
+geoclaw-openai profile evolve --target user --summary "偏好更新" --set preferred_language=Chinese --add preferred_tools=Ollama,QGIS
 
 # 区位/选址
 geoclaw-openai run --case native_cases --city "武汉市"

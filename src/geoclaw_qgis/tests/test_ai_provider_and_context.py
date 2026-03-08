@@ -56,6 +56,25 @@ class TestAIProviderAndContext(unittest.TestCase):
             os.environ.clear()
             os.environ.update(old)
 
+    def test_ollama_provider_uses_local_defaults_without_api_key(self) -> None:
+        old = dict(os.environ)
+        try:
+            os.environ["GEOCLAW_AI_PROVIDER"] = "ollama"
+            os.environ["GEOCLAW_AI_API_KEY"] = ""
+            os.environ["GEOCLAW_OLLAMA_API_KEY"] = ""
+            os.environ["GEOCLAW_AI_BASE_URL"] = ""
+            os.environ["GEOCLAW_OLLAMA_BASE_URL"] = ""
+            os.environ["GEOCLAW_AI_MODEL"] = ""
+            os.environ["GEOCLAW_OLLAMA_MODEL"] = ""
+            cfg = ExternalAIConfig.from_env()
+            self.assertEqual(cfg.provider, "ollama")
+            self.assertEqual(cfg.api_key, "ollama-local")
+            self.assertEqual(cfg.model, "llama3.1:8b")
+            self.assertEqual(cfg.base_url, "http://127.0.0.1:11434/v1")
+        finally:
+            os.environ.clear()
+            os.environ.update(old)
+
 
 if __name__ == "__main__":
     unittest.main()

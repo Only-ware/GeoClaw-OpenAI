@@ -1,4 +1,4 @@
-# GeoClaw CLI 安装与 Onboard（v3.0.0）
+# GeoClaw CLI 安装与 Onboard（v3.1.0）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
@@ -45,6 +45,12 @@ geoclaw-openai onboard --non-interactive \
   --ai-provider gemini \
   --api-key "<GEMINI_KEY>" \
   --ai-model "gemini-flash-latest"
+
+# Ollama（本地模型，默认无需真实 API key）
+geoclaw-openai onboard --non-interactive \
+  --ai-provider ollama \
+  --ai-base-url "http://127.0.0.1:11434/v1" \
+  --ai-model "llama3.1:8b"
 ```
 
 可选参数：`--ai-base-url`、`--qgis-process`、`--default-bbox`、`--registry`、`--workspace`。
@@ -57,12 +63,28 @@ geoclaw-openai profile init
 
 # 查看当前加载路径与摘要
 geoclaw-openai profile show
+
+# 根据对话摘要更新长期偏好（user.md）
+geoclaw-openai profile evolve \
+  --target user \
+  --summary "偏好中文、简洁风格，优先本地模型" \
+  --set preferred_language=Chinese \
+  --set preferred_tone=concise \
+  --add preferred_tools=Ollama,QGIS
+
+# 更新 soul.md 的非安全字段（必须显式允许）
+geoclaw-openai profile evolve \
+  --target soul \
+  --allow-soul \
+  --summary "补充任务使命说明" \
+  --set mission="Help users perform reliable and reproducible geospatial analysis."
 ```
 
 说明：
 - `soul.md`：系统层原则和行为边界（高优先级）。
 - `user.md`：用户长期画像与偏好（软个性化层）。
 - 支持环境变量覆盖路径：`GEOCLAW_SOUL_PATH`、`GEOCLAW_USER_PATH`。
+- `profile evolve` 只允许更新 `soul.md` 的非安全字段；安全边界字段会被系统强制阻断。
 
 ## 4) 后续配置调整（无需重装）
 
@@ -74,6 +96,7 @@ geoclaw-openai config show
 geoclaw-openai config set --ai-provider openai --ai-model gpt-5.4
 geoclaw-openai config set --ai-provider qwen --ai-model qwen3-max
 geoclaw-openai config set --ai-provider gemini --ai-model gemini-3.1-pro-preview
+geoclaw-openai config set --ai-provider ollama --ai-model llama3.1:8b
 
 # 一并更新 API key / URL
 geoclaw-openai config set \
@@ -82,11 +105,12 @@ geoclaw-openai config set \
   --api-key "<GEMINI_KEY>"
 ```
 
-常用模型名（2026-03-07）：
+常用模型名（2026-03-08）：
 
 - OpenAI：`gpt-5.4`、`gpt-5.4-pro`、`gpt-5-mini`、`gpt-5-nano`
 - Gemini：`gemini-3.1-pro-preview`、`gemini-3.1-flash-lite-preview`、`gemini-3-flash-preview`、`gemini-flash-latest`
 - Qwen：`qwen3-max`、`qwen3.5-plus`、`qwen3.5-flash`、`qwen-plus-latest`
+- Ollama：`llama3.1:8b`、`qwen2.5:7b`、`deepseek-r1:8b`（示例）
 
 说明：`geoclaw-openai` 接受任意 provider 当前有效模型 ID，推荐先使用 `*-latest` 别名，需强复现时再固定具体版本名。
 

@@ -1,4 +1,4 @@
-# GeoClaw 原生案例与 Skill 扩展（v3.0.0）
+# GeoClaw 原生案例与 Skill 扩展（v3.1.0）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
@@ -43,7 +43,7 @@ geoclaw-openai run --case site_selection --data-dir data/raw/wuhan_osm --skip-do
 - `pipeline`：执行空间流程
 - `ai`：调用外部 AI API
 
-路由策略（v3.0.0）：
+路由策略（v3.1.0）：
 
 - `soul.md` 定义默认执行层级（优先注册 Skill，再到 QGIS 算子）。
 - `user.md` 提供工具与输出偏好（如偏好 QGIS 可复现流程）。

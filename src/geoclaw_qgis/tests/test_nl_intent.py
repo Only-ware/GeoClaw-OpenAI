@@ -47,6 +47,17 @@ class TestNLIntent(unittest.TestCase):
         self.assertIn("network", plan.cli_args)
         self.assertIn("--pfs-csv", plan.cli_args)
 
+    def test_profile_evolve_intent(self) -> None:
+        plan = parse_nl_query("请根据这次对话更新user.md偏好，偏好中文并优先ollama")
+        self.assertEqual(plan.intent, "profile")
+        self.assertEqual(plan.cli_args[0:2], ["profile", "evolve"])
+        self.assertIn("--target", plan.cli_args)
+        self.assertIn("user", plan.cli_args)
+        self.assertIn("--set", plan.cli_args)
+        self.assertIn("preferred_language=Chinese", plan.cli_args)
+        self.assertIn("--add", plan.cli_args)
+        self.assertIn("preferred_tools=Ollama", plan.cli_args)
+
 
 if __name__ == "__main__":
     unittest.main()
