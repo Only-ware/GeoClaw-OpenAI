@@ -1,0 +1,16 @@
+keywords:
+  distance:
+    - buffer
+    - distance
+    - 距离
+    - area
+    - 面积
+    - 半径
+    - 周边
+crs:
+  geographic:
+    - EPSG:4326
+    - EPSG:4490
+constraints:
+  distance_requires_projected_crs: reproject_to_projected_crs_before_distance_ops
+  unify_crs_before_overlay: unify_crs_before_overlay

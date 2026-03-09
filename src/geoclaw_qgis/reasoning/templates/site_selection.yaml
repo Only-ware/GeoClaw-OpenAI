@@ -1,0 +1,5 @@
+task_type: site_selection
+methods:
+  - weighted_overlay
+  - location_allocation
+  - constrained_candidate_filtering

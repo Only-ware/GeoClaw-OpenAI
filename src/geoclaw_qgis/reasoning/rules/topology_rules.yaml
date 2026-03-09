@@ -1,0 +1,20 @@
+keywords:
+  area:
+    - area
+    - 面积
+geometry_rules:
+  non_polygon_for_area_metric:
+    - point
+    - multipoint
+    - line
+    - multiline
+    - linestring
+    - multilinestring
+constraints:
+  ensure_extent_overlap: ensure_extent_overlap
+warnings:
+  single_dataset: single_dataset_context_may_limit_spatial_relationship_analysis
+  missing_extent: missing_extent_metadata_on_some_datasets
+  extent_non_overlap: dataset_extent_non_overlap
+  no_datasets: no_datasets_attached_to_reasoning_input
+  area_metric_non_polygon: area_metric_with_non_polygon_geometry

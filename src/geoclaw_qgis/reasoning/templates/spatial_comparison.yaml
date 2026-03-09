@@ -1,0 +1,4 @@
+task_type: spatial_comparison
+methods:
+  - zonal_summary
+  - rank_and_compare

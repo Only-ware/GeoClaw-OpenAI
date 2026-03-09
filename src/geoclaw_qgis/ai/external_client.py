@@ -12,12 +12,15 @@ from .context import compress_context
 PROVIDER_OPENAI = "openai"
 PROVIDER_QWEN = "qwen"
 PROVIDER_GEMINI = "gemini"
+PROVIDER_OLLAMA = "ollama"
 DEFAULT_OPENAI_BASE_URL = "https://api.openai.com/v1"
 DEFAULT_OPENAI_MODEL = "gpt-5-mini"
 DEFAULT_QWEN_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
 DEFAULT_QWEN_MODEL = "qwen-plus-latest"
 DEFAULT_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai"
 DEFAULT_GEMINI_MODEL = "gemini-flash-latest"
+DEFAULT_OLLAMA_BASE_URL = "http://127.0.0.1:11434/v1"
+DEFAULT_OLLAMA_MODEL = "llama3.1:8b"
 
 
 @dataclass
@@ -32,8 +35,8 @@ class ExternalAIConfig:
     @classmethod
     def from_env(cls) -> ExternalAIConfig:
         provider = os.environ.get("GEOCLAW_AI_PROVIDER", PROVIDER_OPENAI).strip().lower() or PROVIDER_OPENAI
-        if provider not in {PROVIDER_OPENAI, PROVIDER_QWEN, PROVIDER_GEMINI}:
-            raise ValueError("GEOCLAW_AI_PROVIDER must be one of: openai, qwen, gemini")
+        if provider not in {PROVIDER_OPENAI, PROVIDER_QWEN, PROVIDER_GEMINI, PROVIDER_OLLAMA}:
+            raise ValueError("GEOCLAW_AI_PROVIDER must be one of: openai, qwen, gemini, ollama")
 
         if provider == PROVIDER_QWEN:
             default_base_url = DEFAULT_QWEN_BASE_URL
@@ -47,6 +50,12 @@ class ExternalAIConfig:
             provider_key = os.environ.get("GEOCLAW_GEMINI_API_KEY", "").strip()
             provider_base = os.environ.get("GEOCLAW_GEMINI_BASE_URL", "").strip()
             provider_model = os.environ.get("GEOCLAW_GEMINI_MODEL", "").strip()
+        elif provider == PROVIDER_OLLAMA:
+            default_base_url = DEFAULT_OLLAMA_BASE_URL
+            default_model = DEFAULT_OLLAMA_MODEL
+            provider_key = os.environ.get("GEOCLAW_OLLAMA_API_KEY", "").strip()
+            provider_base = os.environ.get("GEOCLAW_OLLAMA_BASE_URL", "").strip()
+            provider_model = os.environ.get("GEOCLAW_OLLAMA_MODEL", "").strip()
         else:
             default_base_url = DEFAULT_OPENAI_BASE_URL
             default_model = DEFAULT_OPENAI_MODEL
@@ -76,6 +85,9 @@ class ExternalAIConfig:
             )
         )
         max_context_chars = int(os.environ.get("GEOCLAW_AI_MAX_CONTEXT_CHARS", "12000").strip() or "12000")
+        if provider == PROVIDER_OLLAMA and not api_key:
+            # Ollama local OpenAI-compatible endpoint typically does not require API key.
+            api_key = "ollama-local"
         if not (base_url and api_key and model):
             raise ValueError(
                 "AI config missing. Required: provider base_url/api_key/model "
@@ -141,10 +153,9 @@ class ExternalAIClient:
         return content.strip()
 
     def _build_headers(self) -> dict[str, str]:
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self.config.api_key}",
-        }
-        if self.config.provider == PROVIDER_GEMINI:
+        headers = {"Content-Type": "application/json"}
+        if self.config.api_key:
+            headers["Authorization"] = f"Bearer {self.config.api_key}"
+        if self.config.provider == PROVIDER_GEMINI and self.config.api_key:
             headers["x-goog-api-key"] = self.config.api_key
         return headers

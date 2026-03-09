@@ -1,0 +1,27 @@
+keywords:
+  scale:
+    - maup
+    - 尺度
+    - scale
+  causal:
+    - 因果
+    - causal
+    - effect
+    - impact
+    - 导致
+    - 原因
+    - 机制
+  exploratory:
+    - 探索
+    - exploratory
+    - 描述
+    - pattern
+    - 趋势
+    - 分布
+    - 对比
+warnings:
+  maup_scale: maup_or_scale_effects_should_be_reported
+  causal_requires_design: causal_claim_requires_identification_strategy
+  causal_without_design: causal_inference_without_identification_design
+  missing_sensitivity_hints: parameter_sensitivity_hints_missing
+  scale_not_explained: scale_effects_not_explained_in_limitations

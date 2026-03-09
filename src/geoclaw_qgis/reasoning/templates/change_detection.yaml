@@ -1,0 +1,5 @@
+task_type: change_detection
+methods:
+  - raster_differencing
+  - temporal_overlay
+  - trend_analysis

@@ -1,0 +1,14 @@
+dataset_type_rules:
+  trajectory_required:
+    - trajectory
+    - network
+  accessibility_preferred:
+    - network
+    - trajectory
+constraints:
+  trajectory_requires_data: trajectory_task_requires_trajectory_or_network_data
+  readonly_inputs: do_not_overwrite_input
+  workspace_output_only: workspace_output_only
+  registered_tools_only: registered_tools_only
+warnings:
+  accessibility_prefers_network: accessibility_analysis_prefers_network_data
