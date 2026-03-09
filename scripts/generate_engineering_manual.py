@@ -19,7 +19,7 @@ PDF_OUTPUT = ROOT / "GeoClaw-OpenAI_工程说明书.pdf"
 
 TITLE = "GeoClaw-OpenAI 工程说明书"
 SUBTITLE = "UrbanComp Lab @ China University of Geosciences (Wuhan)"
-VERSION = "2.3.4"
+VERSION = "3.1.1"
 TODAY = dt.date.today().isoformat()
 
 sections: list[tuple[str, list[str]]] = [
@@ -28,7 +28,7 @@ sections: list[tuple[str, list[str]]] = [
         [
             "GeoClaw-OpenAI 面向科研、教学与工程团队，提供可复现的 GIS+AI 全流程能力。",
             "项目目标是将数据获取、空间分析、制图表达、AI 解释、Skill 扩展与任务记忆闭环统一到单一 CLI。",
-            "v2.3.4 重点增强了商场选址 Skill 案例、安全门禁与 Skill 编写规范，提升可维护性与团队协作安全性。",
+            "v3.1.1 在 SRE+NL+Skill+Memory 稳定闭环基础上，新增本地大模型与 profile 对话演化机制。",
         ],
     ),
     (
@@ -48,7 +48,8 @@ sections: list[tuple[str, list[str]]] = [
             "- docs/: 技术参考、学习手册、release notes、skill 规范文档。",
             "- pipelines/: 原生分析流程与教学案例流程。",
             "- scripts/: 安装、回归、demo、工程文档生成脚本。",
-            "- src/geoclaw_qgis/: CLI、analysis、providers、skills、memory、security。",
+            "- src/geoclaw_qgis/: CLI、analysis、providers、skills、memory、profile、security。",
+            "- soul.md / user.md: 系统层与用户层长期配置文档。",
         ],
     ),
     (
@@ -59,18 +60,23 @@ sections: list[tuple[str, list[str]]] = [
             "4.3 选址分析：约束筛选 + 综合评分排序，输出 SITE_RANK 与 SITE_CLASS。",
             "4.4 栅格/矢量分析：基于 QGIS Processing 算子与 pipeline 参数化运行。",
             "4.5 自然语言入口：NL 解析为 CLI 执行计划，可预览或直接执行。",
-            "4.6 Skill 扩展：支持 LLM 技能与 QGIS 技能双路径，并提供注册前安全评估。",
-            "4.7 Memory 体系：短期记录、长期复盘、归档与向量检索，支持任务经验复用。",
-            "4.8 轨迹网络：融合 Track-Intel 思路，输出 OD 边、节点、行程与网络摘要。",
+            "4.5.1 端到端报告：NL 在启用 SRE 时可直接输出标准化推理报告（受输出目录安全策略约束）。",
+            "4.6 Soul/User 分层：soul.md 定义系统边界，user.md 定义用户长期偏好，统一解析后供 planner/router/report/memory 复用。",
+            "4.7 Skill 扩展：支持 LLM 技能与 QGIS 技能双路径，并提供注册前安全评估。",
+            "4.8 Memory 体系：短期记录、长期复盘、归档与向量检索，支持任务经验复用。",
+            "4.9 轨迹网络：融合 Track-Intel 思路，输出 OD 边、节点、行程与网络摘要。",
         ],
     ),
     (
-        "5. 2.3.4 版本新增重点",
+        "5. 3.1.1 版本新增重点",
         [
-            "5.1 新增商场选址 Skill 双写法案例：mall_site_selection_llm 与 mall_site_selection_qgis。",
-            "5.2 新增 Skill 安全门禁：skill-registry assess/register，high 风险默认阻断。",
-            "5.3 新增 Skill 编写规范文档，明确字段要求、行为边界、评审清单与测试要求。",
-            "5.4 README 与文档同步补充简要命令示例，便于新成员快速上手。",
+            "5.1 onboard API Key 交互改为可见输入；重配时显示脱敏 key 片段（开头/结尾）。",
+            "5.2 新增 chat --execute：可执行请求自动委派至 nl --execute，并支持 SRE 报告输出。",
+            "5.3 修复显式数据源路由：非武汉 city/bbox/data-dir 请求保持 native run，不被误改写。",
+            "5.4 chat 回退回复消费 soul/user 偏好（语言、语气、使命）并输出建议步骤。",
+            "5.5 新增景德镇聊天端到端案例（聊天过程 + 推理报告 + Top5 结果）供新手复现。",
+            "5.6 测试矩阵增强：覆盖 chat/local/parser/NL 路由与 key 脱敏行为。",
+            "5.7 版本与文档体系升级到 v3.1.1，并在 README 增加沙盒安全声明。",
         ],
     ),
     (
@@ -78,10 +84,15 @@ sections: list[tuple[str, list[str]]] = [
         [
             "6.1 环境检查：bash scripts/check_local_env.sh。",
             "6.2 安装与初始化：bash scripts/install_geoclaw_openai.sh && geoclaw-openai onboard。",
-            "6.3 标准分析：geoclaw-openai run --case native_cases --city \"武汉市\"。",
-            "6.4 Skill 安全评估：geoclaw-openai skill-registry assess --spec-file <skill.json>。",
-            "6.5 通过评估后注册：geoclaw-openai skill-registry register --spec-file <skill.json> --confirm。",
-            "6.6 回归测试：python3 -m unittest discover -s src/geoclaw_qgis/tests。",
+            "6.3 初始化 profile：geoclaw-openai profile init && geoclaw-openai profile show。",
+            "6.4 对话演化 profile：geoclaw-openai profile evolve --target user --summary \"...\" --set preferred_language=Chinese。",
+            "6.5 标准分析：geoclaw-openai run --case native_cases --city \"武汉市\"。",
+            "6.6 端到端询问+报告：geoclaw-openai nl \"商场选址分析\" --use-sre --sre-report-out data/outputs/reasoning/nl_report.md。",
+            "6.7 Skill 安全评估：geoclaw-openai skill-registry assess --spec-file <skill.json>。",
+            "6.8 通过评估后注册：geoclaw-openai skill-registry register --spec-file <skill.json> --confirm。",
+            "6.9 回归测试：python3 -m unittest discover -s src/geoclaw_qgis/tests。",
+            "6.10 复杂端到端测试：bash scripts/e2e_complex_nl_suite.sh。",
+            "6.11 聊天端到端样例：geoclaw-openai chat --message \"请你下载景德镇的数据，并分析最适合建设商场的前5个地址，输出报告\" --no-ai --execute。",
         ],
     ),
     (
@@ -109,6 +120,7 @@ sections: list[tuple[str, list[str]]] = [
         [
             f"文档生成日期：{TODAY}",
             f"当前版本：v{VERSION}",
+            "测试状态：单元测试、day-run、复杂 NL 端到端回归通过。",
             "维护建议：发布前同步检查 README、CHANGELOG、release-notes、工程说明书。",
         ],
     ),

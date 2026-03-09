@@ -1,7 +1,11 @@
-# GeoClaw-OpenAI 科研学习手册（v2.3.4）
+# GeoClaw-OpenAI 科研学习手册（v3.1.1）
 
 适用对象：科研人员、研究生、GIS 初学者  
 项目归属：UrbanComp Lab @ China University of Geosciences (Wuhan)
+
+安装入口导航：
+- 新手优先：`docs/beginner-quickstart.md`
+- 全量安装说明（含 Windows + QGIS）：`README.md` 的「3. 安装与初始化（新手完整流程）」
 
 ## 1. 你可以做什么
 
@@ -17,11 +21,22 @@
 bash scripts/install_geoclaw_openai.sh
 geoclaw-openai onboard
 source ~/.geoclaw-openai/env.sh
+geoclaw-openai profile init
 
 geoclaw-openai run --case native_cases --city "武汉市"
 ```
 
 默认输出在 `data/outputs/` 下。
+
+## 2.1 Soul/User 个性化层
+
+```bash
+geoclaw-openai profile show
+```
+
+- `soul.md`：系统级原则与执行边界（如不覆盖输入、优先可复现流程）。
+- `user.md`：用户长期偏好（语言风格、工具偏好、输出习惯）。
+- 两者在会话初始化自动加载，并影响 NL 规划、路由、报告与复盘建议。
 
 ## 3. 三种输入方式（互斥）
 
@@ -81,7 +96,7 @@ geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
 geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 ```
 
-当前支持解析到：`run`、`operator`、`network`、`skill`、`memory`、`update`。
+当前支持解析到：`run`、`operator`、`network`、`skill`、`memory`、`update`、`profile`、`chat`、`local`。
 
 ## 7. AI Provider 与上下文压缩
 
@@ -90,6 +105,7 @@ geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 - `openai`
 - `qwen`
 - `gemini`
+- `ollama`（本地模型）
 
 切换示例：
 
@@ -97,6 +113,7 @@ geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 geoclaw-openai config set --ai-provider openai --ai-model gpt-5.4
 geoclaw-openai config set --ai-provider qwen --ai-model qwen3-max
 geoclaw-openai config set --ai-provider gemini --ai-model gemini-3.1-pro-preview
+geoclaw-openai config set --ai-provider ollama --ai-model qwen3.5:0.8b
 ```
 
 模型建议（2026-03-07）：

@@ -47,6 +47,37 @@ class TestNLIntent(unittest.TestCase):
         self.assertIn("network", plan.cli_args)
         self.assertIn("--pfs-csv", plan.cli_args)
 
+    def test_profile_evolve_intent(self) -> None:
+        plan = parse_nl_query("请根据这次对话更新user.md偏好，偏好中文并优先ollama")
+        self.assertEqual(plan.intent, "profile")
+        self.assertEqual(plan.cli_args[0:2], ["profile", "evolve"])
+        self.assertIn("--target", plan.cli_args)
+        self.assertIn("user", plan.cli_args)
+        self.assertIn("--set", plan.cli_args)
+        self.assertIn("preferred_language=Chinese", plan.cli_args)
+        self.assertIn("--add", plan.cli_args)
+        self.assertIn("preferred_tools=Ollama", plan.cli_args)
+
+    def test_chat_intent_for_greeting(self) -> None:
+        plan = parse_nl_query("你好，今天怎么样")
+        self.assertEqual(plan.intent, "chat")
+        self.assertEqual(plan.cli_args[0], "chat")
+        self.assertIn("--message", plan.cli_args)
+
+    def test_local_tool_intent(self) -> None:
+        plan = parse_nl_query("执行命令: ls -la")
+        self.assertEqual(plan.intent, "local")
+        self.assertEqual(plan.cli_args[0], "local")
+        self.assertIn("--cmd", plan.cli_args)
+        self.assertIn("ls -la", plan.cli_args)
+
+    def test_mall_request_not_routed_to_chat(self) -> None:
+        plan = parse_nl_query("请你下载景德镇的数据，并分析最适合建设商场的前5个地址，输出报告")
+        self.assertEqual(plan.intent, "run")
+        self.assertIn("--city", plan.cli_args)
+        self.assertIn("景德镇市", plan.cli_args)
+        self.assertIn("site_selection", plan.cli_args)
+
 
 if __name__ == "__main__":
     unittest.main()

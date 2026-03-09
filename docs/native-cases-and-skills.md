@@ -1,4 +1,4 @@
-# GeoClaw 原生案例与 Skill 扩展（v2.3.4）
+# GeoClaw 原生案例与 Skill 扩展（v3.1.1）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
@@ -43,6 +43,12 @@ geoclaw-openai run --case site_selection --data-dir data/raw/wuhan_osm --skip-do
 - `pipeline`：执行空间流程
 - `ai`：调用外部 AI API
 
+路由策略（v3.1.1）：
+
+- `soul.md` 定义默认执行层级（优先注册 Skill，再到 QGIS 算子）。
+- `user.md` 提供工具与输出偏好（如偏好 QGIS 可复现流程）。
+- NL 入口会基于两层信息做命令路由与解释提示。
+
 常用命令：
 
 ```bash
@@ -59,7 +65,7 @@ geoclaw-openai skill -- --skill mall_site_selection_llm --ai-input "基于武汉
 
 ## 4. AI Provider 支持
 
-支持：`openai`、`qwen`、`gemini`
+支持：`openai`、`qwen`、`gemini`、`ollama`
 
 ```bash
 # 初始化时指定 provider
@@ -69,13 +75,15 @@ geoclaw-openai onboard --non-interactive --ai-provider qwen --api-key "<QWEN_KEY
 geoclaw-openai config set --ai-provider openai --ai-model gpt-5.4
 geoclaw-openai config set --ai-provider qwen --ai-model qwen3-max
 geoclaw-openai config set --ai-provider gemini --ai-model gemini-3.1-pro-preview
+geoclaw-openai config set --ai-provider ollama --ai-model llama3.1:8b
 ```
 
-常用模型名（2026-03-07）：
+常用模型名（2026-03-09）：
 
 - OpenAI：`gpt-5.4`、`gpt-5-mini`
 - Gemini：`gemini-3.1-pro-preview`、`gemini-flash-latest`
 - Qwen：`qwen3-max`、`qwen-plus-latest`
+- Ollama：`llama3.1:8b`、`qwen2.5:7b`、`deepseek-r1:8b`
 
 ## 5. 自动上下文压缩
 

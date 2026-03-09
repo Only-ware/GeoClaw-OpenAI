@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 开发指南（v2.3.4）
+# GeoClaw-OpenAI 开发指南（v3.1.1）
 
 本文档用于后续开发与维护，重点说明工程结构、核心机制、扩展入口与本地验证流程。
 
@@ -24,6 +24,8 @@ AI-Agents/
 │   ├── thematic_maps.yaml
 │   └── examples/
 ├── docs/
+├── soul.md
+├── user.md
 ├── pipelines/
 │   ├── cases/
 │   │   ├── location_analysis.yaml
@@ -43,6 +45,7 @@ AI-Agents/
 │   ├── analysis/
 │   ├── memory/
 │   ├── nl/
+│   ├── profile/
 │   ├── security/
 │   └── providers/
 └── data/
@@ -54,8 +57,12 @@ AI-Agents/
 ## 3. 关键模块职责
 
 - `cli/main.py`
-  - 命令入口：`onboard/config/env/update/run/operator/network/skill/memory/nl`
+  - 命令入口：`onboard/config/env/update/run/operator/network/skill/profile/memory/nl`
   - 除 `memory` 命令外，自动记录短期 memory 并自动复盘到长期 memory
+- `src/geoclaw_qgis/profile/layers.py`
+  - 解析 `soul.md`（系统行为边界）与 `user.md`（长期用户偏好）
+  - 会话初始化加载，提供 planner/tool-router/report/memory 的统一上下文
+  - `apply_dialogue_profile_update()` 支持对话摘要驱动的 profile 覆盖写入（含 soul 安全锁）
 - `scripts/geoclaw_case_runner.py`
   - 原生案例统一入口（city/bbox/data-dir）
   - 输出目录强制固定在 `data/outputs`
@@ -63,7 +70,7 @@ AI-Agents/
   - 单算法执行：`--param` / `--param-json` / `--params-file`
   - 执行前做输出安全校验
 - `src/geoclaw_qgis/ai/external_client.py`
-  - OpenAI/Qwen/Gemini provider 统一 client
+  - OpenAI/Qwen/Gemini/Ollama provider 统一 client
   - 自动上下文压缩
 - `src/geoclaw_qgis/memory/store.py`
   - 短期、长期、归档、向量检索
@@ -97,6 +104,9 @@ bash scripts/install_geoclaw_openai.sh
 # 3) 初始化
 geoclaw-openai onboard
 source ~/.geoclaw-openai/env.sh
+geoclaw-openai profile init
+geoclaw-openai profile show
+geoclaw-openai profile evolve --target user --summary "偏好中文并优先本地模型" --set preferred_language=Chinese --add preferred_tools=Ollama,QGIS
 ```
 
 ## 6. 开发与验证流程
@@ -120,6 +130,7 @@ geoclaw-openai operator \
 ```bash
 geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
 geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
+geoclaw-openai nl "商场选址分析，优先可复现QGIS流程" --use-sre --sre-report-out data/outputs/reasoning/nl_e2e_report.md
 ```
 
 ### 6.4 轨迹网络
@@ -134,6 +145,33 @@ bash scripts/run_trackintel_network_demo.sh
 bash scripts/day_run.sh
 ```
 
+当前 day-run 覆盖矩阵（v3.1.1）：
+- run：`native_cases`、`wuhan_advanced`
+- skill：`location_analysis`、`site_selection`（按 API key 自动决定是否附带 AI 总结）
+- reasoning：`reasoning --reasoner-mode deterministic --report-out data/outputs/reasoning/day_run_reasoning.md`
+- nl：`nl --use-sre --sre-reasoner-mode deterministic --sre-report-out data/outputs/reasoning/day_run_nl_e2e_report.md`
+- memory：`memory status/short/long/search`
+
+关键产物校验：
+- `data/outputs/wuhan_location/grid_location.gpkg`
+- `data/outputs/wuhan_site/site_candidates.gpkg`
+- `data/outputs/wuhan_analysis/grid_clustered.gpkg`
+- `data/outputs/wuhan_analysis/maps/geoclaw_index.png`
+- `data/outputs/reasoning/day_run_reasoning.md`
+- `data/outputs/reasoning/day_run_nl_e2e_report.md`
+
+### 6.6 复杂 NL 端到端套件
+
+```bash
+bash scripts/e2e_complex_nl_suite.sh
+```
+
+覆盖 4 组复杂场景：
+- 商场选址 Top-N + SRE 报告
+- 本地数据目录区位分析 + SRE 报告
+- 轨迹网络分析（显式 out-dir 保留）+ SRE 报告
+- Operator 参数列表保留与执行验证
+
 ## 7. 配置与环境变量
 
 推荐统一变量：
@@ -145,7 +183,8 @@ bash scripts/day_run.sh
 - `GEOCLAW_AI_TIMEOUT`
 - `GEOCLAW_AI_MAX_CONTEXT_CHARS`
 
-兼容变量：`GEOCLAW_OPENAI_*`、`GEOCLAW_QWEN_*`、`GEOCLAW_GEMINI_*`。
+兼容变量：`GEOCLAW_OPENAI_*`、`GEOCLAW_QWEN_*`、`GEOCLAW_GEMINI_*`、`GEOCLAW_OLLAMA_*`。
+Profile 变量：`GEOCLAW_SOUL_PATH`、`GEOCLAW_USER_PATH`。
 
 ## 8. 安全策略
 

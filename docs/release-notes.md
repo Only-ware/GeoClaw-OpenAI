@@ -1,28 +1,143 @@
 # GeoClaw-OpenAI Release Notes
 
-## v2.3.4 (2026-03-08)
+## v3.1.1 (2026-03-09)
+
+主要迭代：
+
+1. Onboard API Key 交互体验增强
+   - `geoclaw-openai onboard` 交互输入 API Key 改为可见输入，便于核对超长密钥。
+   - 再次加载配置时会显示脱敏提示（仅保留 key 开头和结尾字符）。
+
+2. Chat 执行链路增强
+   - 新增 `geoclaw-openai chat --execute`：可将可执行请求自动委派到 `nl --execute`。
+   - 支持 `--use-sre` 与 `--sre-report-out`，形成聊天入口下的端到端执行与报告输出。
+
+3. 路由安全修复（显式数据源优先）
+   - 商场选址类请求中，若用户显式提供 `city/bbox/data-dir`（尤其非武汉城市），保持原始研究区输入，不被 Skill 路由误改写。
+   - 对冲突 SRE 路由执行拦截并保留用户显式参数。
+
+4. Chat + Profile 个性化增强
+   - 回退回复支持 `soul.md/user.md` 画像消费（语言、语气、系统使命）。
+   - 增强闲聊建议输出，在不可直接执行时提供下一步操作建议。
+
+5. 测试与用户案例
+   - 新增/增强 chat、NL 路由、CLI parser、API key 脱敏相关测试。
+   - 新增景德镇端到端案例目录：
+     - `data/examples/chat_mode/jingdezhen_mall_top5/`
+     - 包含聊天过程、报告与 Top5 结果表。
+
+6. 版本与文档同步
+   - 包版本与运行时版本升级为 `3.1.1`。
+   - README、技术参考、安装文档、工程说明书同步更新到 `v3.1.1`。
+
+## v3.1.0 (2026-03-08)
+
+主要迭代：
+
+1. 本地大模型支持（Ollama）
+   - 新增 provider：`ollama`。
+   - 默认端点：`http://127.0.0.1:11434/v1`。
+   - 默认模型：`llama3.1:8b`。
+   - `onboard` / `config set` 均支持 `--ai-provider ollama`。
+   - 本地模式可无真实 API Key（自动占位 key 兼容配置检查）。
+
+2. Profile 对话更新机制（可控写入）
+   - 新增命令：`geoclaw-openai profile evolve`。
+   - 支持：`--target user|soul|both`、`--summary`、`--set`、`--add`。
+   - `soul` 更新必须显式 `--allow-soul`。
+   - 安全/执行边界相关 key 在代码层强制锁定，无法通过对话改写。
+
+3. 自然语言路由增强
+   - 新增 profile 更新意图识别。
+   - 可将“更新 user.md/soul.md 偏好”的自然语言请求路由到 `profile evolve`。
+
+4. 测试与文档同步
+   - 新增 Ollama 与 profile-evolve 相关单元测试。
+   - README、技术参考、工程说明书同步更新为 v3.1.0。
+
+## v3.0.0-maintenance (2026-03-08)
+
+主要迭代：
+
+1. NL 路由通用性修复
+   - `run` 意图的 SRE 路由兼容策略收紧为 `run/skill`，阻断误改写到 `operator/network`。
+   - 新增 NL 显式参数保留层，SRE 路由后强制保留用户明确输入：
+     - `run`：`city/bbox/data-dir/top-n/with-maps/...`
+     - `network`：`pfs-csv/out-dir/...`
+     - `operator`：`algorithm + param/param-json` 列表
+
+2. data 目录跟踪策略调整
+   - `.gitignore` 取消对 `data/` 的忽略，便于新用户直接获取学习样例与可复现实验资产。
+
+3. 复杂自然语言端到端测试套件
+   - 新增：`scripts/e2e_complex_nl_suite.sh`
+   - 覆盖 4 组复杂场景（商场选址、本地目录区位、轨迹 network、operator）。
+
+4. 文档更新
+   - README、技术参考、开发指南、新手教程同步更新。
+   - 工程说明书 `GeoClaw-OpenAI_工程说明书.docx/.pdf` 重新生成。
+
+## v3.0.0 (2026-03-08)
 
 主要迭代：
 
 1. 版本升级
-   - 包版本与运行时版本升级为 `2.3.4`。
+   - 包版本与运行时版本升级为 `3.0.0`。
 
-2. Skill 能力增强（商场选址）
-   - 新增 `mall_site_selection_llm`：基于大模型策略推理的选址 Skill 案例。
-   - 新增 `mall_site_selection_qgis`：基于 QGIS Processing 的可复现选址 Skill 案例。
+2. SRE 3.0 重构阶段收口（Milestone A-F）
+   - 规则与模板配置化（`reasoning/rules/*.yaml`、`reasoning/templates/*.yaml`）。
+   - `execution_plan` 路由安全校验（白名单、命令形状、跨意图阻断）。
+   - 高级推理字段（`reasoning_mode`、`uncertainty_score`、`sensitivity_hints`）及报告输出。
+   - 外部 LLM reasoner 支持配置化模板、结构化校验重试、strict/non-strict 降级策略。
+   - 外部错误详情脱敏，避免 API key 片段进入结果。
 
-3. Skill 安全门禁
-   - 新增 `skill-registry assess` 与 `skill-registry register` 工作流。
-   - 支持注册前风险评估，`high` 风险默认阻断，并要求用户确认后注册。
+3. 端到端询问并输出报告（NL + SRE）
+   - `nl` 新增：
+     - `--sre-report-out`：将 SRE 推理报告直接写入 `data/outputs`。
+     - `--sre-print-report`：在终端输出 Markdown 报告。
+   - 形成“自然语言询问 -> SRE 推理 -> 报告输出”的端到端链路。
 
-4. Skill 文档体系补全
-   - 新增 Skill 编写规范文档、商场选址案例说明、安全评估说明文档。
-   - README 补充上述能力的简要命令示例。
+4. day-run 扩展与回归收敛
+   - `scripts/day_run.sh` 扩展为 11 步回归矩阵：
+     - `run`（native + advanced）
+     - `skill`（location + site）
+     - `reasoning` 报告
+     - `nl --use-sre` 报告
+     - `memory` 冒烟
+   - 固定校验产物新增：
+     - `data/outputs/reasoning/day_run_reasoning.md`
+     - `data/outputs/reasoning/day_run_nl_e2e_report.md`
 
-5. 模型配置与文档同步
-   - README 与 docs 全面更新为最新模型族示例（GPT-5、Gemini 3.x、Qwen3）。
-   - CLI 默认 provider 预设模型更新为：`gpt-5-mini`、`qwen-plus-latest`、`gemini-flash-latest`。
-   - `day_run` 默认模型同步更新为 `gpt-5-mini`。
+5. 文档与工程说明书更新
+   - README、docs 与技术说明同步到 `v3.0.0`。
+   - 工程说明书 `GeoClaw-OpenAI_工程说明书.docx/.pdf` 重新生成并纳入本次发布。
+
+## v2.4.0 (2026-03-08)
+
+主要迭代：
+
+1. 版本升级
+   - 包版本与运行时版本升级为 `2.4.0`。
+
+2. Soul/User 双层个性化架构
+   - 新增 `soul.md`（系统身份、地理推理原则、执行边界）。
+   - 新增 `user.md`（用户长期画像、偏好、输出习惯）。
+   - 会话初始化自动加载并解析为结构化对象。
+
+3. 模块接入落地（planner/router/report/memory）
+   - planner（`nl/intent.py`）消费 profile 上下文，增强命令规划与解释原因。
+   - tool router（`cli nl` / `skill runner`）消费执行层级与用户偏好，支持注册 Skill 优先路由。
+   - report generator（`run_qgis_pipeline.py`）在 `pipeline_report.json` 写入 profile 元信息。
+   - memory manager（`memory/store.py`）新增 profile 快照并在复盘建议中引用长期偏好。
+
+4. Profile CLI 与用户引导
+   - 新增 `geoclaw-openai profile init`。
+   - 新增 `geoclaw-openai profile show`。
+   - `onboard` 后自动确保 `~/.geoclaw-openai/soul.md` 与 `user.md` 存在。
+
+5. 文档与工程说明书更新
+   - README、docs 全量同步到 v2.4.0。
+   - 工程说明书 `GeoClaw-OpenAI_工程说明书.docx/.pdf` 重新生成并纳入本次发布。
 
 ## v2.3.0 (2026-03-07)
 
