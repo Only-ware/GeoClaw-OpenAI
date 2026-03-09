@@ -1,5 +1,22 @@
 # GeoClaw-OpenAI Release Notes
 
+## v3.1.2 (2026-03-09)
+
+主要迭代：
+
+1. 新增可直接用分析 Skill 文档
+   - 新增 `docs/analysis-skills-quickstart.md`。
+   - 面向新手提供 ready-to-run Skill 清单（`pipeline/ai/builtin`）与最短命令示例。
+   - 明确 `--set/--args/--arg` 参数规则和输出目录定位方法。
+
+2. Skill 规范与文档一致性增强
+   - `docs/skill-authoring-spec.md` 新增 `builtin` 类型字段与测试要求。
+   - `docs/native-cases-and-skills.md` 增加快速上手文档入口。
+
+3. 版本与文档同步
+   - 包版本与运行时版本升级为 `3.1.2`。
+   - README、安装/开发/技术参考文档统一更新到 `v3.1.2`。
+
 ## v3.1.1 (2026-03-09)
 
 主要迭代：

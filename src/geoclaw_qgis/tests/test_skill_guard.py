@@ -41,6 +41,34 @@ class TestSkillGuard(unittest.TestCase):
             self.assertFalse(report["allowed_without_override"])
             self.assertGreaterEqual(len(report["findings"]), 1)
 
+    def test_assess_safe_builtin_skill(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            spec = {
+                "id": "network_trackintel_skill",
+                "type": "builtin",
+                "description": "safe builtin network skill",
+                "builtin": ["network"],
+                "default_args": ["--dry-run"],
+            }
+            report = assess_skill_spec(spec, workspace_root=root)
+            self.assertEqual(report["risk_level"], "low")
+            self.assertTrue(report["allowed_without_override"])
+
+    def test_assess_builtin_with_invalid_root(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            spec = {
+                "id": "bad_builtin",
+                "type": "builtin",
+                "description": "bad root",
+                "builtin": ["local"],
+            }
+            report = assess_skill_spec(spec, workspace_root=root)
+            self.assertEqual(report["risk_level"], "high")
+            self.assertFalse(report["allowed_without_override"])
+            self.assertTrue(any(x.get("code") == "BUILTIN_ROOT" for x in report["findings"]))
+
     def test_upsert_registry_add_and_replace(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)

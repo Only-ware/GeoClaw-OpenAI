@@ -94,7 +94,7 @@ class TestNLSRERouting(unittest.TestCase):
     @patch("geoclaw_qgis.cli.main.bootstrap_runtime_env")
     @patch("geoclaw_qgis.cli.main.get_session_profile")
     @patch("geoclaw_qgis.cli.main.parse_nl_query")
-    def test_mall_route_preserves_top_n_for_skill_pipeline(
+    def test_mall_route_with_explicit_city_keeps_run_route_and_top_n(
         self,
         mock_parse: Mock,
         mock_session: Mock,
@@ -123,12 +123,12 @@ class TestNLSRERouting(unittest.TestCase):
 
         self.assertEqual(rc, 0)
         payload = _extract_payload(out)
-        self.assertEqual(
-            payload["cli_args"],
-            ["skill", "--", "--skill", "mall_site_selection_qgis", "--set", "top_n=5"],
-        )
-        self.assertNotIn("--skip-download", payload["cli_args"])
-        self.assertTrue(any("Preserved NL top-n" in x for x in payload["tool_route_notes"]))
+        self.assertEqual(payload["cli_args"][0:3], ["run", "--case", "site_selection"])
+        self.assertIn("--city", payload["cli_args"])
+        self.assertIn("武汉市", payload["cli_args"])
+        self.assertIn("--top-n", payload["cli_args"])
+        self.assertIn("5", payload["cli_args"])
+        self.assertTrue(any("keep native run route" in x.lower() for x in payload["tool_route_notes"]))
 
     @patch("geoclaw_qgis.cli.main.bootstrap_runtime_env")
     @patch("geoclaw_qgis.cli.main.get_session_profile")
@@ -294,10 +294,11 @@ class TestNLSRERouting(unittest.TestCase):
 
         self.assertEqual(rc, 0)
         payload = _extract_payload(out)
-        self.assertEqual(
-            payload["cli_args"],
-            ["skill", "--", "--skill", "mall_site_selection_qgis", "--set", "top_n=5"],
-        )
+        self.assertEqual(payload["cli_args"][0:3], ["run", "--case", "site_selection"])
+        self.assertIn("--city", payload["cli_args"])
+        self.assertIn("武汉市", payload["cli_args"])
+        self.assertIn("--top-n", payload["cli_args"])
+        self.assertIn("5", payload["cli_args"])
         self.assertTrue(
             any("cross-intent reroute" in x for x in payload["tool_route_notes"])
             or any("rejected conflicting SRE reroute" in x for x in payload["tool_route_notes"])

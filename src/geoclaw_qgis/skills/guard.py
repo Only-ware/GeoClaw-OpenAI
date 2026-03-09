@@ -7,7 +7,8 @@ from pathlib import Path
 from typing import Any
 
 
-ALLOWED_SKILL_TYPES = {"pipeline", "ai"}
+ALLOWED_SKILL_TYPES = {"pipeline", "ai", "builtin"}
+ALLOWED_BUILTIN_ROOTS = {"run", "operator", "network", "reasoning"}
 
 _HIGH_RISK_PATTERNS = (
     (re.compile(r"\brm\s+-rf\b", re.IGNORECASE), "Destructive shell command pattern detected."),
@@ -47,6 +48,8 @@ def _skill_text_blob(skill: dict[str, Any]) -> str:
         str(skill.get("id", "")),
         str(skill.get("description", "")),
         str(skill.get("pipeline", "")),
+        " ".join(str(x) for x in (skill.get("builtin") or [])),
+        " ".join(str(x) for x in (skill.get("default_args") or [])),
         str(skill.get("report_path", "")),
         str(skill.get("system_prompt", "")),
         " ".join(str(x) for x in (skill.get("pre_steps") or [])),
@@ -124,6 +127,24 @@ def assess_skill_spec(
         elif len(system_prompt) > 8000:
             findings.append(SkillFinding("medium", "PROMPT_TOO_LONG", "system_prompt is very long (>8000 chars)."))
 
+    if skill_type == "builtin":
+        builtin = [str(x).strip() for x in (skill.get("builtin") or []) if str(x).strip()]
+        if not builtin:
+            findings.append(SkillFinding("high", "MISSING_BUILTIN", "Builtin skill requires non-empty 'builtin' command list."))
+        else:
+            root = builtin[0]
+            if root not in ALLOWED_BUILTIN_ROOTS:
+                findings.append(
+                    SkillFinding(
+                        "high",
+                        "BUILTIN_ROOT",
+                        f"Unsupported builtin root: '{root}'. Allowed: {sorted(ALLOWED_BUILTIN_ROOTS)}.",
+                    )
+                )
+        default_args = skill.get("default_args") or []
+        if not isinstance(default_args, list):
+            findings.append(SkillFinding("medium", "DEFAULT_ARGS_TYPE", "default_args should be a list of strings."))
+
     blob = _skill_text_blob(skill)
     for pattern, msg in _HIGH_RISK_PATTERNS:
         if pattern.search(blob):
@@ -198,4 +219,3 @@ def upsert_skill_registry(
 
     registry_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     return {"skill_id": skill_id, "action": action, "registry": str(registry_path)}
-

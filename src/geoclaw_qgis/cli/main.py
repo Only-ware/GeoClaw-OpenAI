@@ -569,7 +569,7 @@ def _chat_suggestions(message: str, session: SessionProfile) -> list[str]:
     english = "english" in lang and "chinese" not in lang
     if english:
         suggestions = [
-            "For spatial analysis, you can ask: `Top 5 mall locations in Wuhan`.",
+            "For spatial analysis, you can ask: `Top 5 mall locations in <your city>`.",
             "To preview executable command, run: `geoclaw-openai nl \"your request\"`.",
             "To execute directly, add: `--execute`.",
         ]
@@ -1381,8 +1381,6 @@ def cmd_nl(args: argparse.Namespace) -> int:
         source_data_dir = _extract_flag_value(plan.cli_args, "--data-dir")
         has_explicit_source = bool(source_city or source_bbox or source_data_dir)
         allow_skill_route = not has_explicit_source
-        if source_city in {"武汉市", "武汉"}:
-            allow_skill_route = True
         if allow_skill_route:
             preferred = "mall_site_selection_qgis"
             if any(k in query_lower for k in ("llm", "ai", "大模型")):
@@ -1399,7 +1397,7 @@ def cmd_nl(args: argparse.Namespace) -> int:
         else:
             locked_cli_args = list(plan.cli_args)
             route_notes.append(
-                "Detected explicit non-Wuhan input source; keep native run route to preserve requested study area."
+                "Detected explicit input source; keep native run route to preserve requested study area."
             )
 
     sre_payload: dict[str, object] | None = None

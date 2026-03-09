@@ -4,6 +4,28 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [3.1.2] - 2026-03-09
+
+### Added
+- Added a beginner-facing analysis-skill quickstart guide:
+  - `docs/analysis-skills-quickstart.md`
+  - covers ready-to-run `pipeline/ai/builtin` skills, minimal commands, and output locations.
+
+### Changed
+- Bumped project/package runtime version to `3.1.2`.
+- Updated README quick links and versioned sections for `v3.1.2`.
+- Updated docs version headers to `v3.1.2` across onboarding/guide/reference pages.
+- Updated skill authoring spec to include `builtin` type requirements and test steps.
+- Updated engineering-manual generator text/version to `v3.1.2`.
+
+### Tested
+- `python3 -m unittest discover -s src/geoclaw_qgis/tests` (100 tests, pass).
+- Skill smoke checks:
+  - `python3 scripts/geoclaw_skill_runner.py --list`
+  - `python3 scripts/geoclaw_skill_runner.py --skill vector_basics_qgis --set raw_dir=data/raw/wuhan_osm --set out_dir=data/outputs/demo_vector_v312 --skip-download`
+  - `python3 scripts/geoclaw_skill_runner.py --skill raster_basics_qgis --set raw_dir=data/raw/wuhan_osm --set out_dir=data/outputs/demo_raster_v312 --skip-download`
+  - `python3 scripts/geoclaw_skill_runner.py --skill network_trackintel_skill --args \"--pfs-csv data/examples/trajectory/trackintel_demo_pfs.csv --out-dir data/outputs/network_trackintel_v312\"`
+
 ## [3.1.1] - 2026-03-09
 
 ### Added

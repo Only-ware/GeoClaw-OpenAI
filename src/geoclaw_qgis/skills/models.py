@@ -9,6 +9,8 @@ class SkillSpec:
     skill_type: str
     description: str = ""
     pipeline: str = ""
+    builtin: list[str] = field(default_factory=list)
+    default_args: list[str] = field(default_factory=list)
     requires_osm: bool = False
     default_bbox: str = ""
     report_path: str = ""

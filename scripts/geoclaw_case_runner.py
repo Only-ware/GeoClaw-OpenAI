@@ -88,6 +88,59 @@ def run_cmd(cmd: list[str]) -> None:
         raise RuntimeError(f"command failed ({proc.returncode}): {' '.join(cmd)}")
 
 
+def _iter_lon_lat(node: Any):
+    if isinstance(node, (list, tuple)):
+        if len(node) >= 2 and isinstance(node[0], (int, float)) and isinstance(node[1], (int, float)):
+            yield float(node[0]), float(node[1])
+            return
+        for item in node:
+            yield from _iter_lon_lat(item)
+
+
+def _utm_epsg_from_lon_lat(lon: float, lat: float) -> str:
+    if not (-180.0 <= lon <= 180.0 and -90.0 <= lat <= 90.0):
+        return "EPSG:3857"
+    zone = int((lon + 180.0) // 6.0) + 1
+    zone = max(1, min(zone, 60))
+    if lat >= 0:
+        return f"EPSG:{32600 + zone}"
+    return f"EPSG:{32700 + zone}"
+
+
+def infer_target_crs(raw_dir: Path) -> str:
+    study_area = raw_dir / "study_area.geojson"
+    if not study_area.exists():
+        return "EPSG:3857"
+    try:
+        payload = json.loads(study_area.read_text(encoding="utf-8"))
+    except Exception:
+        return "EPSG:3857"
+
+    features = payload.get("features")
+    if not isinstance(features, list):
+        return "EPSG:3857"
+
+    lon_vals: list[float] = []
+    lat_vals: list[float] = []
+    for ft in features:
+        if not isinstance(ft, dict):
+            continue
+        geom = ft.get("geometry")
+        if not isinstance(geom, dict):
+            continue
+        coords = geom.get("coordinates")
+        for lon, lat in _iter_lon_lat(coords):
+            lon_vals.append(lon)
+            lat_vals.append(lat)
+
+    if not lon_vals or not lat_vals:
+        return "EPSG:3857"
+
+    center_lon = (min(lon_vals) + max(lon_vals)) / 2.0
+    center_lat = (min(lat_vals) + max(lat_vals)) / 2.0
+    return _utm_epsg_from_lon_lat(center_lon, center_lat)
+
+
 def pick_qgis_python(explicit: str = "") -> str:
     if explicit:
         p = Path(explicit).expanduser()
@@ -229,6 +282,7 @@ def main() -> int:
     if args.with_maps and args.no_maps:
         raise ValueError("--with-maps and --no-maps cannot be used together")
     run_maps = args.with_maps or (args.case == "wuhan_advanced" and not args.no_maps)
+    target_crs = infer_target_crs(raw_dir)
 
     location_cfg = ROOT / "pipelines/cases/location_analysis.yaml"
     site_cfg = ROOT / "pipelines/cases/site_selection.yaml"
@@ -244,6 +298,7 @@ def main() -> int:
         "raw_dir": str(raw_dir),
         "out_root": str(out_root),
         "bbox": chosen_bbox,
+        "target_crs": target_crs,
     }
 
     if args.case in {"location_analysis", "native_cases", "site_selection"}:
@@ -252,6 +307,7 @@ def main() -> int:
             {
                 "raw_dir": str(raw_dir),
                 "out_dir": str(location_out),
+                "target_crs": target_crs,
             },
         )
         results["location_output"] = str(location_out / "grid_location.gpkg")
@@ -274,6 +330,7 @@ def main() -> int:
             {
                 "raw_dir": str(raw_dir),
                 "out_dir": str(advanced_out),
+                "target_crs": target_crs,
             },
         )
         results["advanced_output"] = str(advanced_out / "grid_clustered.gpkg")

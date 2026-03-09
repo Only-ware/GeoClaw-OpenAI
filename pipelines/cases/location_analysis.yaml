@@ -6,8 +6,8 @@ description: >-
   score and location level classification grid.
 
 variables:
-  raw_dir: data/raw/wuhan_osm
-  out_dir: data/outputs/wuhan_location
+  raw_dir: data/raw/default_osm
+  out_dir: data/outputs/default_location
   target_crs: EPSG:32650
   grid_spacing_m: 2000
   hospital_buffer_m: 2000

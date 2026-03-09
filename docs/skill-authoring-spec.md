@@ -1,6 +1,6 @@
-# GeoClaw Skill 编写规范（项目 v3.1.1，规范 v1.0）
+# GeoClaw Skill 编写规范（项目 v3.1.2，规范 v1.0）
 
-本文档定义 GeoClaw-OpenAI 项目中的 skill 编写要求，适用于 `configs/skills_registry.json` 中的 `pipeline` 与 `ai` 类型。
+本文档定义 GeoClaw-OpenAI 项目中的 skill 编写要求，适用于 `configs/skills_registry.json` 中的 `pipeline`、`ai` 与 `builtin` 类型。
 
 ## 1. 总体原则
 
@@ -24,7 +24,7 @@
 ### 3.1 通用必填字段
 
 - `id`：skill 唯一标识
-- `type`：`pipeline` 或 `ai`
+- `type`：`pipeline`、`ai` 或 `builtin`
 - `description`：一句话说明用途
 
 ### 3.2 pipeline 类型必填字段
@@ -41,6 +41,15 @@
 ### 3.4 ai 类型必填字段
 
 - `system_prompt`：稳定约束输出结构的提示词
+
+### 3.5 builtin 类型必填字段
+
+- `builtin`：GeoClaw 内置命令片段数组，如 `["operator"]`、`["network"]`、`["run"]`
+
+### 3.6 builtin 类型推荐字段
+
+- `default_args`：默认命令参数 token 列表，便于开箱即用
+- `report_path`：若会产出报告，建议声明默认报告路径
 
 ## 4. Pipeline Skill 编写规范
 
@@ -107,7 +116,12 @@ geoclaw-openai skill -- --skill <pipeline_skill_id> --skip-download
 geoclaw-openai skill -- --skill <ai_skill_id> --ai-input "smoke test"
 ```
 
-4. 单元测试
+4. builtin skill 测试
+```bash
+geoclaw-openai skill -- --skill <builtin_skill_id> --args "--help"
+```
+
+5. 单元测试
 ```bash
 python3 -m unittest discover -s src/geoclaw_qgis/tests -p 'test_*.py'
 ```

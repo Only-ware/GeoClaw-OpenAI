@@ -21,6 +21,26 @@ class TestSkillRegistry(unittest.TestCase):
         self.assertIn("mall site selection", llm_skill.description.lower())
         self.assertTrue(bool(llm_skill.system_prompt.strip()))
 
+    def test_vector_raster_network_skills_registered(self) -> None:
+        root = Path(__file__).resolve().parents[3]
+        registry = SkillRegistry(root / "configs" / "skills_registry.json")
+
+        vector_skill = registry.get("vector_basics_qgis")
+        self.assertEqual(vector_skill.skill_type, "pipeline")
+        self.assertTrue(vector_skill.pipeline.endswith("pipelines/examples/vector_basics.yaml"))
+
+        raster_skill = registry.get("raster_basics_qgis")
+        self.assertEqual(raster_skill.skill_type, "pipeline")
+        self.assertTrue(raster_skill.pipeline.endswith("pipelines/examples/raster_basics.yaml"))
+
+        network_skill = registry.get("network_trackintel_skill")
+        self.assertEqual(network_skill.skill_type, "builtin")
+        self.assertEqual(network_skill.builtin, ["network"])
+
+        operator_skill = registry.get("qgis_operator_skill")
+        self.assertEqual(operator_skill.skill_type, "builtin")
+        self.assertEqual(operator_skill.builtin, ["operator"])
+
 
 if __name__ == "__main__":
     unittest.main()
