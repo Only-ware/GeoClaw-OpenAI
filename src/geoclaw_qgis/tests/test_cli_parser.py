@@ -45,9 +45,22 @@ class TestCLIParser(unittest.TestCase):
 
     def test_chat_command_exists(self) -> None:
         parser = build_parser()
-        args = parser.parse_args(["chat", "--message", "你好"])
+        args = parser.parse_args(
+            [
+                "chat",
+                "--message",
+                "你好",
+                "--execute",
+                "--use-sre",
+                "--sre-report-out",
+                "data/outputs/reasoning/chat_report.md",
+            ]
+        )
         self.assertEqual(args.command, "chat")
         self.assertEqual(args.message_opt, "你好")
+        self.assertTrue(args.execute)
+        self.assertTrue(args.use_sre)
+        self.assertEqual(args.sre_report_out, "data/outputs/reasoning/chat_report.md")
 
     def test_local_command_exists(self) -> None:
         parser = build_parser()

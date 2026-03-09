@@ -1,6 +1,6 @@
-# GeoClaw-OpenAI 技术参考（科研与团队版，v3.1.0）
+# GeoClaw-OpenAI 技术参考（科研与团队版，v3.1.1）
 
-更新时间：2026-03-08（Asia/Shanghai）  
+更新时间：2026-03-09（Asia/Shanghai）  
 机构：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
 ## 1. 技术定位
@@ -184,6 +184,7 @@ geoclaw-openai nl "商场选址分析，优先可复现QGIS流程" --use-sre --s
 
 # 闲聊模式
 geoclaw-openai chat --message "我运行失败了，下一步怎么排查？" --no-ai
+geoclaw-openai chat --message "请你下载景德镇的数据，并分析最适合建设商场的前5个地址，输出报告" --no-ai --execute --use-sre --sre-report-out data/outputs/reasoning/chat_jingdezhen_mall_top5_report.md
 
 # 本地工具调用
 geoclaw-openai local --cmd "qgis_process --version" --timeout 30
@@ -195,6 +196,8 @@ geoclaw-openai memory search --query "output guard" --scope all --top-k 5
 # 更新
 geoclaw-openai update --check-only
 ```
+
+说明：`onboard` 在 v3.1.1 中采用 API Key 可见输入，并在重配时显示脱敏 key 片段（开头/结尾），用于快速确认当前有效配置。
 
 ## 7. 测试与回归建议
 
@@ -214,7 +217,8 @@ geoclaw-openai update --check-only
 ## 8. 数据目录跟踪策略
 
 - `data/` 不再被 `.gitignore` 忽略，便于新用户直接获取学习样例与复现实验资产。
-- 推荐示例入口：`data/examples/`，其中包含轨迹与选址端到端教学样例。
+- 推荐示例入口：`data/examples/`，其中包含轨迹、选址以及聊天模式端到端教学样例。
+- 新增聊天模式案例：`data/examples/chat_mode/jingdezhen_mall_top5/`。
 
 ## 9. TODO（技术路线）
 

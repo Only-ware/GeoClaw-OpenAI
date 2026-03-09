@@ -42,7 +42,7 @@ source ~/.geoclaw-openai/env.sh
 `onboard` 会引导你配置：
 
 - AI provider（OpenAI / Qwen / Gemini / Ollama）
-- API Key
+- API Key（v3.1.1 起输入为可见模式，重配时提示脱敏 key 片段）
 - 默认模型
 - 默认 bbox
 
@@ -83,6 +83,20 @@ geoclaw-openai nl "武汉最适合建商场的前5个地点"
 ```
 
 这会输出 `command_preview` 和 `cli_args`，确认后再加 `--execute`。
+
+## 5.1 聊天模式端到端（不会写代码也可用）
+
+```bash
+geoclaw-openai chat \
+  --message "请你下载景德镇的数据，并分析最适合建设商场的前5个地址，输出报告" \
+  --no-ai \
+  --execute \
+  --use-sre \
+  --sre-report-out data/outputs/reasoning/chat_jingdezhen_mall_top5_report.md
+```
+
+参考案例产物目录：
+- `data/examples/chat_mode/jingdezhen_mall_top5/README.md`
 
 ## 6. 常见问题
 

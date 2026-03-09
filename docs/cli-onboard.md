@@ -1,4 +1,4 @@
-# GeoClaw CLI 安装与 Onboard（v3.1.0）
+# GeoClaw CLI 安装与 Onboard（v3.1.1）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
@@ -30,6 +30,10 @@ source ~/.geoclaw-openai/env.sh
 - `~/.geoclaw-openai/env.sh`
 - `~/.geoclaw-openai/soul.md`
 - `~/.geoclaw-openai/user.md`
+
+交互输入说明（v3.1.1）：
+- API Key 输入为可见模式，便于核对长 key。
+- 若已配置旧 key，提示中会展示脱敏片段（仅开头+结尾），回车可保持原值。
 
 ## 3) 非交互初始化
 
@@ -111,7 +115,7 @@ geoclaw-openai config set \
   --api-key "<GEMINI_KEY>"
 ```
 
-常用模型名（2026-03-08）：
+常用模型名（2026-03-09）：
 
 - OpenAI：`gpt-5.4`、`gpt-5.4-pro`、`gpt-5-mini`、`gpt-5-nano`
 - Gemini：`gemini-3.1-pro-preview`、`gemini-3.1-flash-lite-preview`、`gemini-3-flash-preview`、`gemini-flash-latest`

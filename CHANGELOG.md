@@ -4,17 +4,32 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [3.1.1] - 2026-03-09
+
 ### Added
-- Added chat mode command:
-  - `geoclaw-openai chat --message "..."`
-  - Returns fallback suggestions when direct resolution is not possible.
-- Added local tool command:
-  - `geoclaw-openai local --cmd "<command>"`
-  - Supports timeout/cwd/shell options.
-- Added NL intent routing for:
-  - `chat`
-  - `local` (e.g., "执行命令 ...").
-- Added tests for chat/local parser and command execution smoke.
+- Added onboarding API key UX enhancements:
+  - interactive key input is visible (not hidden) for long-key verification
+  - reconfiguration prompt shows masked hint with key prefix/suffix only.
+- Added chat execution delegation path:
+  - `geoclaw-openai chat --execute` delegates actionable requests to `nl --execute`
+  - supports `--use-sre` and `--sre-report-out`.
+- Added a new end-to-end user case:
+  - `data/examples/chat_mode/jingdezhen_mall_top5/`
+  - includes chat process, raw output, reasoning report, and top-5 CSV summary.
+
+### Changed
+- Hardened NL routing for mall-like requests with explicit non-Wuhan data sources:
+  - preserve explicit `--city/--bbox/--data-dir` and keep native `run` route
+  - reject conflicting SRE reroute when source constraints are explicit.
+- Enhanced fallback chat behavior with `soul.md/user.md` personalization:
+  - language/tone-aware suggestions and replies
+  - mission-aware fallback phrasing.
+- Updated README/docs and engineering manual to `v3.1.1`.
+- Bumped runtime/package version to `3.1.1`.
+
+### Tested
+- `python3 -m unittest discover -s src/geoclaw_qgis/tests` (93 tests, pass).
+- End-to-end chat scenario (Jingdezhen mall top-5) generated artifacts successfully.
 
 ## [3.1.0] - 2026-03-08
 

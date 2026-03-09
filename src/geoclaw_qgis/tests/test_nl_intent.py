@@ -71,6 +71,13 @@ class TestNLIntent(unittest.TestCase):
         self.assertIn("--cmd", plan.cli_args)
         self.assertIn("ls -la", plan.cli_args)
 
+    def test_mall_request_not_routed_to_chat(self) -> None:
+        plan = parse_nl_query("请你下载景德镇的数据，并分析最适合建设商场的前5个地址，输出报告")
+        self.assertEqual(plan.intent, "run")
+        self.assertIn("--city", plan.cli_args)
+        self.assertIn("景德镇市", plan.cli_args)
+        self.assertIn("site_selection", plan.cli_args)
+
 
 if __name__ == "__main__":
     unittest.main()

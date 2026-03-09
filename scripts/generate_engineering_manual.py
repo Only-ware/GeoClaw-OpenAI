@@ -19,7 +19,7 @@ PDF_OUTPUT = ROOT / "GeoClaw-OpenAI_工程说明书.pdf"
 
 TITLE = "GeoClaw-OpenAI 工程说明书"
 SUBTITLE = "UrbanComp Lab @ China University of Geosciences (Wuhan)"
-VERSION = "3.1.0"
+VERSION = "3.1.1"
 TODAY = dt.date.today().isoformat()
 
 sections: list[tuple[str, list[str]]] = [
@@ -28,7 +28,7 @@ sections: list[tuple[str, list[str]]] = [
         [
             "GeoClaw-OpenAI 面向科研、教学与工程团队，提供可复现的 GIS+AI 全流程能力。",
             "项目目标是将数据获取、空间分析、制图表达、AI 解释、Skill 扩展与任务记忆闭环统一到单一 CLI。",
-            "v3.1.0 在 SRE+NL+Skill+Memory 稳定闭环基础上，新增本地大模型与 profile 对话演化机制。",
+            "v3.1.1 在 SRE+NL+Skill+Memory 稳定闭环基础上，新增本地大模型与 profile 对话演化机制。",
         ],
     ),
     (
@@ -68,15 +68,15 @@ sections: list[tuple[str, list[str]]] = [
         ],
     ),
     (
-        "5. 3.1.0 版本新增重点",
+        "5. 3.1.1 版本新增重点",
         [
-            "5.1 新增 Ollama 本地大模型 provider，并接入 onboard/config set 全链路。",
-            "5.2 新增 profile evolve：支持根据对话摘要更新 user.md/soul.md 覆盖层。",
-            "5.3 soul 安全边界字段锁定：重要安全与执行约束不可通过对话改写。",
-            "5.4 新增 NL->profile 路由能力：自然语言可触发 profile 演化命令。",
-            "5.5 day-run 与单元测试矩阵扩展，覆盖 profile evolve 与 provider 兼容性。",
-            "5.6 data 目录持续跟踪，支持新用户直接复现实验样例。",
-            "5.7 版本与文档体系升级到 v3.1.0。",
+            "5.1 onboard API Key 交互改为可见输入；重配时显示脱敏 key 片段（开头/结尾）。",
+            "5.2 新增 chat --execute：可执行请求自动委派至 nl --execute，并支持 SRE 报告输出。",
+            "5.3 修复显式数据源路由：非武汉 city/bbox/data-dir 请求保持 native run，不被误改写。",
+            "5.4 chat 回退回复消费 soul/user 偏好（语言、语气、使命）并输出建议步骤。",
+            "5.5 新增景德镇聊天端到端案例（聊天过程 + 推理报告 + Top5 结果）供新手复现。",
+            "5.6 测试矩阵增强：覆盖 chat/local/parser/NL 路由与 key 脱敏行为。",
+            "5.7 版本与文档体系升级到 v3.1.1，并在 README 增加沙盒安全声明。",
         ],
     ),
     (
@@ -92,6 +92,7 @@ sections: list[tuple[str, list[str]]] = [
             "6.8 通过评估后注册：geoclaw-openai skill-registry register --spec-file <skill.json> --confirm。",
             "6.9 回归测试：python3 -m unittest discover -s src/geoclaw_qgis/tests。",
             "6.10 复杂端到端测试：bash scripts/e2e_complex_nl_suite.sh。",
+            "6.11 聊天端到端样例：geoclaw-openai chat --message \"请你下载景德镇的数据，并分析最适合建设商场的前5个地址，输出报告\" --no-ai --execute。",
         ],
     ),
     (

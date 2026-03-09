@@ -1,5 +1,35 @@
 # GeoClaw-OpenAI Release Notes
 
+## v3.1.1 (2026-03-09)
+
+主要迭代：
+
+1. Onboard API Key 交互体验增强
+   - `geoclaw-openai onboard` 交互输入 API Key 改为可见输入，便于核对超长密钥。
+   - 再次加载配置时会显示脱敏提示（仅保留 key 开头和结尾字符）。
+
+2. Chat 执行链路增强
+   - 新增 `geoclaw-openai chat --execute`：可将可执行请求自动委派到 `nl --execute`。
+   - 支持 `--use-sre` 与 `--sre-report-out`，形成聊天入口下的端到端执行与报告输出。
+
+3. 路由安全修复（显式数据源优先）
+   - 商场选址类请求中，若用户显式提供 `city/bbox/data-dir`（尤其非武汉城市），保持原始研究区输入，不被 Skill 路由误改写。
+   - 对冲突 SRE 路由执行拦截并保留用户显式参数。
+
+4. Chat + Profile 个性化增强
+   - 回退回复支持 `soul.md/user.md` 画像消费（语言、语气、系统使命）。
+   - 增强闲聊建议输出，在不可直接执行时提供下一步操作建议。
+
+5. 测试与用户案例
+   - 新增/增强 chat、NL 路由、CLI parser、API key 脱敏相关测试。
+   - 新增景德镇端到端案例目录：
+     - `data/examples/chat_mode/jingdezhen_mall_top5/`
+     - 包含聊天过程、报告与 Top5 结果表。
+
+6. 版本与文档同步
+   - 包版本与运行时版本升级为 `3.1.1`。
+   - README、技术参考、安装文档、工程说明书同步更新到 `v3.1.1`。
+
 ## v3.1.0 (2026-03-08)
 
 主要迭代：

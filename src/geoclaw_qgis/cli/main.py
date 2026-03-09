@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import getpass
 import json
 import os
 import re
@@ -146,9 +145,20 @@ def ask_value(prompt: str, default: str = "") -> str:
     return raw if raw else default
 
 
-def ask_secret(prompt: str, default_masked: bool = False) -> str:
-    suffix = " [已配置, 回车保持]" if default_masked else ""
-    return getpass.getpass(f"{prompt}{suffix}: ").strip()
+def _mask_api_key(value: str, *, head: int = 4, tail: int = 4) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    if len(text) <= head + tail:
+        return text[:1] + "*" * max(0, len(text) - 2) + text[-1:] if len(text) > 2 else "*" * len(text)
+    return f"{text[:head]}***{text[-tail:]}"
+
+
+def ask_api_key(prompt: str, existing_key: str = "") -> str:
+    masked = _mask_api_key(existing_key)
+    suffix = f" [当前: {masked}, 回车保持]" if masked else ""
+    raw = input(f"{prompt}{suffix}: ").strip()
+    return raw if raw else str(existing_key or "").strip()
 
 
 def cmd_onboard(args: argparse.Namespace) -> int:
@@ -217,9 +227,7 @@ def cmd_onboard(args: argparse.Namespace) -> int:
                 print("[WARN] qgis_process 路径无效，将仅写入原值")
                 detected_qgis = qgis_input
 
-        api_key = args.api_key or ask_secret(f"{ai_provider.upper()} API Key", default_masked=bool(existing_key))
-        if not api_key and existing_key:
-            api_key = existing_key
+        api_key = args.api_key or ask_api_key(f"{ai_provider.upper()} API Key", existing_key=existing_key)
     else:
         api_key = args.api_key or existing_key
         if not detected_qgis:
@@ -555,29 +563,75 @@ def cmd_profile_evolve(args: argparse.Namespace) -> int:
     return 0
 
 
-def _chat_suggestions(message: str) -> list[str]:
+def _chat_suggestions(message: str, session: SessionProfile) -> list[str]:
     text = str(message or "").strip().lower()
-    suggestions = [
-        "如果是空间分析任务，可直接说：`武汉最适合建商场的前5个地点`。",
-        "如需查看可执行命令，先用：`geoclaw-openai nl \"你的问题\"`（预览模式）。",
-        "如需直接运行，请加：`--execute`。",
-    ]
+    lang = session.user.preferred_language.strip().lower()
+    english = "english" in lang and "chinese" not in lang
+    if english:
+        suggestions = [
+            "For spatial analysis, you can ask: `Top 5 mall locations in Wuhan`.",
+            "To preview executable command, run: `geoclaw-openai nl \"your request\"`.",
+            "To execute directly, add: `--execute`.",
+        ]
+    else:
+        suggestions = [
+            "如果是空间分析任务，可直接说：`武汉最适合建商场的前5个地点`。",
+            "如需查看可执行命令，先用：`geoclaw-openai nl \"你的问题\"`（预览模式）。",
+            "如需直接运行，请加：`--execute`。",
+        ]
     if any(k in text for k in ("报错", "error", "失败", "无法", "can't", "cannot")):
-        suggestions.insert(0, "先提供报错原文、输入数据路径、你执行的完整命令，我会给出逐步修复方案。")
+        if english:
+            suggestions.insert(0, "Please share the exact error, command, and input path; I will provide a step-by-step fix.")
+        else:
+            suggestions.insert(0, "先提供报错原文、输入数据路径、你执行的完整命令，我会给出逐步修复方案。")
     if any(k in text for k in ("命令", "shell", "tool", "工具")):
-        suggestions.append("如需调用本地命令：`geoclaw-openai local --cmd \"<your command>\"`。")
+        if english:
+            suggestions.append("To run a local command: `geoclaw-openai local --cmd \"<your command>\"`.")
+        else:
+            suggestions.append("如需调用本地命令：`geoclaw-openai local --cmd \"<your command>\"`。")
     return suggestions
 
 
-def _fallback_chat_reply(message: str) -> str:
+def _fallback_chat_reply(message: str, session: SessionProfile) -> str:
     text = str(message or "").strip()
+    lang = session.user.preferred_language.strip().lower()
+    tone = session.user.preferred_tone.strip().lower()
+    mission = session.soul.mission.strip()
+    english = "english" in lang and "chinese" not in lang
+    detailed = "detailed" in tone or "详细" in tone or "step-by-step" in tone
     if not text:
+        if english:
+            return "Tell me your goal and I can help plan an executable GeoClaw workflow."
         return "请告诉我你的目标，我可以协助你规划 GeoClaw 工作流。"
     if any(k in text.lower() for k in ("报错", "error", "失败", "无法", "can't", "cannot")):
-        return "我暂时无法直接定位全部上下文。建议先提供报错堆栈、输入路径和执行命令，我会给你可执行的修复步骤。"
+        if english:
+            return (
+                f"Mission: {mission or 'Reliable geospatial analysis'}. "
+                "I cannot resolve all context yet. Share the stack trace, input path, and command; "
+                "I will provide actionable debug steps."
+            )
+        return (
+            f"系统使命：{mission or '可靠、可复现的地理分析'}。"
+            "我暂时无法直接定位全部上下文。请提供报错堆栈、输入路径和执行命令，我会给你可执行的修复步骤。"
+        )
     if any(k in text for k in ("你好", "您好")):
+        if english:
+            return "Hello. I can chat and also convert your request into executable GeoClaw commands."
         return "你好，我可以闲聊，也可以帮你把需求转成可执行的 GeoClaw 命令。"
-    return "我理解你的问题。若当前信息不足以直接执行，我会先给出可落地的下一步建议。"
+    if detailed:
+        if english:
+            return (
+                f"Mission: {mission or 'Reliable geospatial analysis'}. "
+                "I understand your request. I suggest three steps: clarify goal, validate data and CRS, "
+                "then run and review reproducible outputs."
+            )
+        return (
+            f"系统使命：{mission or '可靠、可复现的地理分析'}。"
+            "我理解你的问题。建议三步：1) 明确目标与约束；2) 检查数据与坐标系；3) 执行并复核可复现输出。"
+        )
+    if english:
+        return f"Mission: {mission or 'Reliable geospatial analysis'}. I understand your request and will provide actionable next steps."
+    return f"系统使命：{mission or '可靠、可复现的地理分析'}。我理解你的问题，会先给出可落地的下一步建议。"
 
 
 def _chat_response_payload(*, message: str, session: SessionProfile, prefer_ai: bool = True) -> dict[str, object]:
@@ -603,11 +657,11 @@ def _chat_response_payload(*, message: str, session: SessionProfile, prefer_ai: 
         except Exception as exc:
             ai_error = str(exc)
     if not reply.strip():
-        reply = _fallback_chat_reply(message)
+        reply = _fallback_chat_reply(message, session)
     payload: dict[str, object] = {
         "mode": mode,
         "reply": reply,
-        "suggestions": _chat_suggestions(message),
+        "suggestions": _chat_suggestions(message, session),
     }
     if ai_error:
         payload["ai_warning"] = "AI response unavailable; fallback response is used."
@@ -634,7 +688,32 @@ def cmd_chat(args: argparse.Namespace) -> int:
             "user_path": session.user_path,
         },
     }
+    if bool(getattr(args, "execute", False)):
+        plan = parse_nl_query(message, session=session)
+        payload["execution_plan"] = plan.to_dict()
+        if plan.intent != "chat":
+            nl_cmd = [os.environ.get("PYTHON", "python3"), "-m", "geoclaw_qgis.cli.main", "nl", message, "--execute"]
+            if bool(getattr(args, "use_sre", False)):
+                nl_cmd.extend(["--use-sre"])
+            report_out = str(getattr(args, "sre_report_out", "") or "").strip()
+            if report_out:
+                nl_cmd.extend(["--sre-report-out", report_out])
+            proc = subprocess.run(nl_cmd, check=False, capture_output=True, text=True)
+            payload["execution"] = {
+                "command": nl_cmd,
+                "return_code": int(proc.returncode),
+                "stdout": proc.stdout,
+                "stderr": proc.stderr,
+            }
+        else:
+            payload["execution"] = {
+                "return_code": 0,
+                "note": "chat intent does not require workflow execution",
+            }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
+    execution = payload.get("execution")
+    if isinstance(execution, dict):
+        return int(execution.get("return_code", 0))
     return 0
 
 
@@ -1297,18 +1376,31 @@ def cmd_nl(args: argparse.Namespace) -> int:
     locked_cli_args: list[str] | None = None
     query_lower = query_text.lower()
     if plan.intent in {"run", "operator"} and any(k in query_lower for k in ("mall", "shopping", "商场")):
-        preferred = "mall_site_selection_qgis"
-        if any(k in query_lower for k in ("llm", "ai", "大模型")):
-            preferred = "mall_site_selection_llm"
-        routed_cli_args = ["skill", "--", "--skill", preferred]
-        top_n = _extract_flag_value(plan.cli_args, "--top-n")
-        if top_n and preferred == "mall_site_selection_qgis":
-            routed_cli_args.extend(["--set", f"top_n={top_n}"])
-            route_notes.append(f"Preserved NL top-n for skill pipeline: top_n={top_n}.")
-        if "--skip-download" in plan.cli_args and preferred == "mall_site_selection_qgis":
-            routed_cli_args.append("--skip-download")
-        locked_cli_args = list(routed_cli_args)
-        route_notes.append(f"Tool router prioritized registered skill={preferred} by soul execution hierarchy.")
+        source_city = _extract_flag_value(plan.cli_args, "--city")
+        source_bbox = _extract_flag_value(plan.cli_args, "--bbox")
+        source_data_dir = _extract_flag_value(plan.cli_args, "--data-dir")
+        has_explicit_source = bool(source_city or source_bbox or source_data_dir)
+        allow_skill_route = not has_explicit_source
+        if source_city in {"武汉市", "武汉"}:
+            allow_skill_route = True
+        if allow_skill_route:
+            preferred = "mall_site_selection_qgis"
+            if any(k in query_lower for k in ("llm", "ai", "大模型")):
+                preferred = "mall_site_selection_llm"
+            routed_cli_args = ["skill", "--", "--skill", preferred]
+            top_n = _extract_flag_value(plan.cli_args, "--top-n")
+            if top_n and preferred == "mall_site_selection_qgis":
+                routed_cli_args.extend(["--set", f"top_n={top_n}"])
+                route_notes.append(f"Preserved NL top-n for skill pipeline: top_n={top_n}.")
+            if "--skip-download" in plan.cli_args and preferred == "mall_site_selection_qgis":
+                routed_cli_args.append("--skip-download")
+            locked_cli_args = list(routed_cli_args)
+            route_notes.append(f"Tool router prioritized registered skill={preferred} by soul execution hierarchy.")
+        else:
+            locked_cli_args = list(plan.cli_args)
+            route_notes.append(
+                "Detected explicit non-Wuhan input source; keep native run route to preserve requested study area."
+            )
 
     sre_payload: dict[str, object] | None = None
     if bool(args.use_sre) and plan.intent in _SRE_SPATIAL_INTENTS:
@@ -1357,7 +1449,7 @@ def cmd_nl(args: argparse.Namespace) -> int:
             if locked_cli_args is not None and routed_cli_args != locked_cli_args:
                 routed_cli_args = list(locked_cli_args)
                 route_notes.append(
-                    "Kept explicit NL-prioritized skill route; rejected conflicting SRE reroute."
+                    "Kept explicit NL-prioritized route; rejected conflicting SRE reroute."
                 )
             if args.sre_strict and sre_result.validation.status == "fail":
                 route_notes.append("SRE strict mode blocked execution because validation status=fail.")
@@ -1863,6 +1955,9 @@ def build_parser() -> argparse.ArgumentParser:
     chat.add_argument("--message", dest="message_opt", default="", help="chat message text (option form)")
     chat.add_argument("--with-ai", action="store_true", help="prefer AI response if provider is configured")
     chat.add_argument("--no-ai", action="store_true", help="force fallback response without AI call")
+    chat.add_argument("--execute", action="store_true", help="execute parsed workflow when message is actionable")
+    chat.add_argument("--use-sre", action="store_true", help="enable SRE when executing actionable workflow")
+    chat.add_argument("--sre-report-out", default="", help="optional SRE report output path used with --execute")
     chat.set_defaults(func=cmd_chat)
 
     reasoning = sub.add_parser("reasoning", help="run Spatial Reasoning Engine (internal)")

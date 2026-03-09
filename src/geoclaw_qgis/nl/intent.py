@@ -48,6 +48,12 @@ SPATIAL_HINTS = (
     "analysis",
     "spatial",
     "qgis",
+    "分析",
+    "下载",
+    "商场",
+    "地址",
+    "报告",
+    "建设",
 )
 
 
@@ -132,6 +138,8 @@ def _detect_city(text: str, text_lower: str) -> str:
 
     if "武汉" in text:
         return "武汉市"
+    if "景德镇" in text:
+        return "景德镇市"
     if "beijing" in text_lower:
         return "Beijing"
     if "shanghai" in text_lower:
@@ -144,7 +152,7 @@ def _detect_city(text: str, text_lower: str) -> str:
 
 
 def _detect_case(text: str, text_lower: str) -> str:
-    if _contains_any(text, ("选址", "候选点", "site")):
+    if _contains_any(text, ("选址", "候选点", "site", "商场", "商业综合体", "mall")):
         return "site_selection"
     if _contains_any(text, ("区位", "location")):
         return "location_analysis"
