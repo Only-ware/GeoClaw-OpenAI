@@ -17,15 +17,15 @@ Generated artifacts:
 Execution summary:
 - `execution_result.return_code = 0`
 - `tool_route_notes` confirms explicit city preservation:
-  - `Detected explicit non-Wuhan input source; keep native run route...`
+  - `Detected explicit input source; keep native run route...`
   - `Kept explicit NL-prioritized route; rejected conflicting SRE reroute.`
-- Top5 scores (`jingdezhen_site_top5_summary.csv`):
-  - `1,55.0,PRIORITY_A`
-  - `2,54.1398,PRIORITY_A`
-  - `3,53.9491,PRIORITY_A`
-  - `4,53.3059,PRIORITY_A`
-  - `5,53.0679,PRIORITY_A`
+- Top5 scores + coordinates (`jingdezhen_site_top5_summary.csv`):
+  - `1,55.0,PRIORITY_A,116.96192971,29.9260178`
+  - `2,54.1398,PRIORITY_A,116.98265099,29.92602215`
+  - `3,53.9491,PRIORITY_A,116.96193658,29.90796835`
+  - `4,53.3059,PRIORITY_A,117.00337227,29.92602325`
+  - `5,53.0679,PRIORITY_A,116.98265412,29.90797271`
 
 Notes:
 - This case validates `chat --execute` delegates actionable requests to NL workflow execution.
-- Non-Wuhan explicit city input is preserved (`景德镇市`) and route stays on native `run` flow.
+- Explicit city input is preserved (`景德镇市`) and route stays on native `run` flow.

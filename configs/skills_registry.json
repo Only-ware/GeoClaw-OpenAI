@@ -8,7 +8,7 @@
       "pipeline": "pipelines/cases/location_analysis.yaml",
       "requires_osm": true,
       "default_bbox": "30.50,114.20,30.66,114.45",
-      "report_path": "data/outputs/wuhan_location/pipeline_report.json"
+      "report_path": "data/outputs/default_location/pipeline_report.json"
     },
     {
       "id": "site_selection",
@@ -20,7 +20,7 @@
       "pre_steps": [
         "location_analysis"
       ],
-      "report_path": "data/outputs/wuhan_site/pipeline_report.json"
+      "report_path": "data/outputs/default_site/pipeline_report.json"
     },
     {
       "id": "ai_planning_assistant",
@@ -42,6 +42,46 @@
       "type": "ai",
       "description": "Use LLM to generate mall site selection strategy and explainable ranking rules.",
       "system_prompt": "You are a senior commercial-location analyst. Build a mall site selection plan from user inputs and GeoClaw indicators. Output structure: 1) objective and constraints, 2) scoring formula with weights, 3) top candidate zone profile, 4) risk list and mitigation, 5) field checklist for validation."
+    },
+    {
+      "id": "vector_basics_qgis",
+      "type": "pipeline",
+      "description": "QGIS vector-analysis demo skill (reproject, buffer, clip, field-calc, dissolve).",
+      "pipeline": "pipelines/examples/vector_basics.yaml",
+      "requires_osm": false,
+      "report_path": "data/outputs/demo_vector/pipeline_report.json"
+    },
+    {
+      "id": "raster_basics_qgis",
+      "type": "pipeline",
+      "description": "QGIS raster-analysis demo skill (heatmap KDE + zonal stats + normalization).",
+      "pipeline": "pipelines/examples/raster_basics.yaml",
+      "requires_osm": false,
+      "report_path": "data/outputs/demo_raster/pipeline_report.json"
+    },
+    {
+      "id": "qgis_operator_skill",
+      "type": "builtin",
+      "description": "Generic QGIS Processing operator skill. Pass algorithm/params via --arg/--args.",
+      "builtin": [
+        "operator"
+      ]
+    },
+    {
+      "id": "network_trackintel_skill",
+      "type": "builtin",
+      "description": "Generic trajectory-network skill (TrackIntel backend). Pass pfs/out-dir via --arg/--args.",
+      "builtin": [
+        "network"
+      ]
+    },
+    {
+      "id": "run_case_skill",
+      "type": "builtin",
+      "description": "Generic built-in case skill. Pass city/bbox/data-dir and case via --arg/--args.",
+      "builtin": [
+        "run"
+      ]
     }
   ]
 }

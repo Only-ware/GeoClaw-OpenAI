@@ -13,6 +13,12 @@ TOPN_RE = re.compile(r"(?:top\s*[-_ ]?n|前)\s*(\d{1,4})", re.IGNORECASE)
 PATH_HINT_RE = re.compile(r"([~./\\A-Za-z0-9_\-]+/[A-Za-z0-9_\-./\\]+)")
 CITY_EXPLICIT_RE = re.compile(r"(?:city|城市)\s*[:：]?\s*([A-Za-z\u4e00-\u9fff]{2,20})", re.IGNORECASE)
 CITY_CN_RE = re.compile(r"(?:^|[^\u4e00-\u9fff])([\u4e00-\u9fff]{2,12}市)(?:[^\u4e00-\u9fff]|$)")
+CITY_CN_REGION_RE = re.compile(r"(?:^|[^\u4e00-\u9fff])([\u4e00-\u9fff]{2,16}(?:市|州|县|区|旗|盟))(?:[^\u4e00-\u9fff]|$)")
+CITY_CN_SIMPLE_RE = re.compile(r"([\u4e00-\u9fff]{2,12}市)")
+CITY_CN_ACTION_RE = re.compile(
+    r"(?:在|于|用|对|给|下载|基于|围绕)\s*([\u4e00-\u9fff]{2,16}(?:市|州|县|区|旗|盟)?)(?:的)?(?:数据|做|进行|开展|分析|选址|区位)"
+)
+CITY_EN_RE = re.compile(r"(?:\b(?:city|in|at)\b\s*[:：]?\s*)([A-Za-z][A-Za-z\-\s]{1,40})", re.IGNORECASE)
 BACKTICK_RE = re.compile(r"`([^`]+)`")
 LOCAL_CMD_INLINE_RE = re.compile(
     r"(?:执行(?:本地)?命令|运行(?:本地)?命令|run\s+local\s+cmd|run\s+command|shell)\s*[:：]?\s*(.+)$",
@@ -119,9 +125,12 @@ def _detect_data_dir(text: str) -> str:
 def _detect_city(text: str, text_lower: str) -> str:
     def _normalize_city_name(raw_city: str) -> str:
         city = raw_city.strip()
+        city = re.sub(r"^(请你|请|帮我|帮忙)\s*", "", city)
         # Remove frequent leading function words in Chinese prompts.
         while len(city) > 2 and city[:1] in {"用", "在", "按", "对", "给"}:
             city = city[1:]
+        city = city.strip(" ,，。.;；:：")
+        city = city.rstrip("的")
         return city
 
     m = CITY_EXPLICIT_RE.search(text)
@@ -136,18 +145,27 @@ def _detect_city(text: str, text_lower: str) -> str:
     if m2:
         return _normalize_city_name(m2.group(1))
 
-    if "武汉" in text:
-        return "武汉市"
-    if "景德镇" in text:
-        return "景德镇市"
-    if "beijing" in text_lower:
-        return "Beijing"
-    if "shanghai" in text_lower:
-        return "Shanghai"
-    if "guangzhou" in text_lower:
-        return "Guangzhou"
-    if "shenzhen" in text_lower:
-        return "Shenzhen"
+    m2b = CITY_CN_SIMPLE_RE.search(text)
+    if m2b:
+        return _normalize_city_name(m2b.group(1))
+
+    m3 = CITY_CN_REGION_RE.search(text)
+    if m3:
+        return _normalize_city_name(m3.group(1))
+
+    m3b = CITY_CN_ACTION_RE.search(text)
+    if m3b:
+        city = _normalize_city_name(m3b.group(1))
+        if city and city.endswith(("市", "州", "县", "区", "旗", "盟")):
+            return city
+        if city:
+            return f"{city}市"
+
+    m4 = CITY_EN_RE.search(text)
+    if m4:
+        city = _normalize_city_name(m4.group(1))
+        if city:
+            return re.sub(r"\s+", " ", city)
     return ""
 
 
@@ -161,7 +179,7 @@ def _detect_case(text: str, text_lower: str) -> str:
     if _contains_any(text_lower, ("native", "原生")):
         return "native_cases"
     if _contains_any(text, ("地图", "出图", "制图")):
-        return "wuhan_advanced"
+        return "location_analysis"
     return "native_cases"
 
 
@@ -347,7 +365,7 @@ def _build_operator_plan(query: str, text: str, text_lower: str, session: Sessio
         reasons.append(f"Detected buffer distance={distance}.")
 
     output = "data/outputs/nl/operator_buffer.gpkg"
-    in_path = "data/raw/wuhan_osm/hospitals.geojson"
+    in_path = "data/raw/input/hospitals.geojson"
 
     paths = PATH_HINT_RE.findall(text)
     if len(paths) >= 1:
@@ -427,10 +445,6 @@ def _build_run_plan(query: str, text: str, text_lower: str, session: SessionProf
     elif city:
         cli_args.extend(["--city", city])
         reasons.append(f"Resolved city={city}.")
-    elif session is not None and case in {"site_selection", "location_analysis", "native_cases"}:
-        if _contains_any(" ".join(session.user.common_project_contexts).lower(), ("urban", "site", "location", "城市", "选址")):
-            cli_args.extend(["--city", "武汉市"])
-            reasons.append("No explicit source found; used profile default city=武汉市.")
     else:
         reasons.append("No explicit input source found; fallback to default runtime bbox/cached data.")
 

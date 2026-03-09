@@ -158,7 +158,7 @@ class TestSpatialReasoningEngine(unittest.TestCase):
         self.assertEqual(result["execution_plan"]["command"][:3], ["run", "--case", "location_analysis"])
         self.assertEqual(result["reasoning_summary"]["reasoning_mode"], "exploratory")
 
-    def test_site_selection_mall_prefers_qgis_skill_route(self) -> None:
+    def test_site_selection_mall_prefers_city_agnostic_run_route(self) -> None:
         input_data = build_reasoning_input(
             query="做一个武汉商场选址分析并输出候选点",
             datasets=[
@@ -168,9 +168,10 @@ class TestSpatialReasoningEngine(unittest.TestCase):
             planner_hints={"candidate_task_type": "site_selection"},
         )
         result = run_spatial_reasoning(input_data).to_dict()
-        self.assertEqual(result["execution_plan"]["route_target"], "skill")
+        self.assertEqual(result["execution_plan"]["route_target"], "run")
         self.assertTrue(result["execution_plan"]["safe_to_execute"])
-        self.assertEqual(result["execution_plan"]["command"][:4], ["skill", "--", "--skill", "mall_site_selection_qgis"])
+        self.assertEqual(result["execution_plan"]["command"][:3], ["run", "--case", "site_selection"])
+        self.assertIn(["skill", "--", "--skill", "mall_site_selection_qgis", "--skip-download"], result["execution_plan"]["alternatives"])
         self.assertIn("criteria", result["workflow_plan"]["steps"][0]["parameters"])
         self.assertIn("weights", result["workflow_plan"]["steps"][0]["parameters"])
 

@@ -28,6 +28,8 @@ class SkillRegistry:
                 skill_type=str(item.get("type", "")).strip(),
                 description=str(item.get("description", "")).strip(),
                 pipeline=str(item.get("pipeline", "")).strip(),
+                builtin=[str(x).strip() for x in (item.get("builtin") or []) if str(x).strip()],
+                default_args=[str(x) for x in (item.get("default_args") or [])],
                 requires_osm=bool(item.get("requires_osm", False)),
                 default_bbox=str(item.get("default_bbox", "")).strip(),
                 report_path=str(item.get("report_path", "")).strip(),

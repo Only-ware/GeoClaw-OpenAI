@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 技术参考（科研与团队版，v3.1.1）
+# GeoClaw-OpenAI 技术参考（科研与团队版，v3.1.2）
 
 更新时间：2026-03-09（Asia/Shanghai）  
 机构：UrbanComp Lab @ China University of Geosciences (Wuhan)
@@ -197,7 +197,7 @@ geoclaw-openai memory search --query "output guard" --scope all --top-k 5
 geoclaw-openai update --check-only
 ```
 
-说明：`onboard` 在 v3.1.1 中采用 API Key 可见输入，并在重配时显示脱敏 key 片段（开头/结尾），用于快速确认当前有效配置。
+说明：`onboard` 在 v3.1.2 中采用 API Key 可见输入，并在重配时显示脱敏 key 片段（开头/结尾），用于快速确认当前有效配置。
 
 ## 7. 测试与回归建议
 

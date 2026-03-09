@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -27,12 +28,21 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--registry", default=os.environ.get("GEOCLAW_OPENAI_SKILL_REGISTRY", "configs/skills_registry.json"))
     parser.add_argument("--list", action="store_true", help="list available skills")
     parser.add_argument("--skill", default="", help="skill id to run")
+    parser.add_argument("--city", default="", help="city name for OSM download when required")
     parser.add_argument("--bbox", default=os.environ.get("GEOCLAW_OPENAI_DEFAULT_BBOX", ""), help="bbox for OSM download")
     parser.add_argument("--skip-download", action="store_true", help="skip OSM download")
     parser.add_argument("--with-ai", action="store_true", help="run external AI summarization")
     parser.add_argument("--require-ai", action="store_true", help="fail if AI call is unavailable")
     parser.add_argument("--ai-input", default="", help="extra AI prompt text")
     parser.add_argument("--ai-input-file", default="", help="load extra AI prompt text from file")
+    parser.add_argument(
+        "--arg",
+        action="append",
+        default=[],
+        metavar="TOKEN",
+        help="extra token passed to builtin skill command (repeatable)",
+    )
+    parser.add_argument("--args", default="", help="extra command tokens for builtin skills (shell-style string)")
     parser.add_argument(
         "--set",
         action="append",
@@ -59,6 +69,7 @@ def read_text(path: str) -> str:
 def run_pipeline_skill(
     skill_id: str,
     registry: SkillRegistry,
+    city: str,
     bbox: str,
     skip_download: bool,
     var_overrides: list[str] | None = None,
@@ -71,18 +82,21 @@ def run_pipeline_skill(
     for pre in spec.pre_steps:
         pre_spec = registry.get(pre)
         if pre_spec.skill_type == "pipeline":
-            run_pipeline_skill(pre, registry, bbox, skip_download, var_overrides=var_overrides)
+            run_pipeline_skill(pre, registry, city, bbox, skip_download, var_overrides=var_overrides)
 
     if spec.requires_osm and not skip_download:
         use_bbox = bbox or spec.default_bbox
         cmd = [
             sys.executable,
             str(ROOT / "scripts" / "download_osm_wuhan.py"),
-            "--bbox",
-            use_bbox,
             "--timeout",
             "120",
         ]
+        use_city = city.strip()
+        if use_city:
+            cmd.extend(["--city", use_city])
+        else:
+            cmd.extend(["--bbox", use_bbox])
         run_cmd(cmd)
 
     pipeline_cmd = [
@@ -91,17 +105,66 @@ def run_pipeline_skill(
         "--config",
         str(ROOT / spec.pipeline),
     ]
+    override_map: dict[str, str] = {}
     for item in var_overrides:
         text = str(item).strip()
         if text:
+            if "=" in text:
+                k, v = text.split("=", 1)
+                override_map[k.strip()] = v.strip()
             pipeline_cmd.extend(["--set", text])
     run_cmd(pipeline_cmd)
+
+    report_path = spec.report_path
+    out_dir = override_map.get("out_dir", "").strip()
+    if out_dir:
+        report_path = str(Path(out_dir) / "pipeline_report.json")
 
     return {
         "skill": spec.skill_id,
         "type": spec.skill_type,
         "pipeline": spec.pipeline,
-        "report": spec.report_path,
+        "report": report_path,
+    }
+
+
+def _collect_user_tokens(args: argparse.Namespace) -> list[str]:
+    tokens: list[str] = []
+    for item in args.arg:
+        text = str(item).strip()
+        if text:
+            tokens.append(text)
+    if args.args.strip():
+        tokens.extend(shlex.split(args.args.strip()))
+    return tokens
+
+
+def run_builtin_skill(
+    skill_id: str,
+    registry: SkillRegistry,
+    *,
+    user_tokens: list[str],
+) -> dict[str, Any]:
+    spec = registry.get(skill_id)
+    if spec.skill_type != "builtin":
+        raise ValueError(f"skill {skill_id} is not builtin type")
+    if not spec.builtin:
+        raise ValueError(f"builtin skill {skill_id} missing builtin command")
+
+    root = spec.builtin[0]
+    if root not in {"run", "operator", "network", "reasoning"}:
+        raise ValueError(f"unsupported builtin root command: {root}")
+
+    cmd = [sys.executable, "-m", "geoclaw_qgis.cli.main", *spec.builtin]
+    cmd.extend(list(spec.default_args))
+    cmd.extend(user_tokens)
+    run_cmd(cmd)
+    return {
+        "skill": spec.skill_id,
+        "type": spec.skill_type,
+        "builtin": spec.builtin,
+        "default_args": spec.default_args,
+        "executed_command": cmd,
     }
 
 
@@ -178,11 +241,13 @@ def main() -> int:
 
     spec = registry.get(args.skill)
     result: dict[str, Any]
+    user_tokens = _collect_user_tokens(args)
 
     if spec.skill_type == "pipeline":
         result = run_pipeline_skill(
             args.skill,
             registry,
+            args.city,
             args.bbox,
             args.skip_download,
             var_overrides=args.set,
@@ -190,6 +255,12 @@ def main() -> int:
     elif spec.skill_type == "ai":
         extra = args.ai_input or read_text(args.ai_input_file)
         result = run_ai_skill(args.skill, registry, extra, args.require_ai)
+    elif spec.skill_type == "builtin":
+        result = run_builtin_skill(
+            args.skill,
+            registry,
+            user_tokens=user_tokens,
+        )
     else:
         raise ValueError(f"unsupported skill type: {spec.skill_type}")
 

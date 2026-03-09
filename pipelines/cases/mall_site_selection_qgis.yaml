@@ -6,7 +6,7 @@ description: >-
   and produces ranked mall candidate points.
 
 variables:
-  location_input: data/outputs/wuhan_location/grid_location.gpkg
+  location_input: data/outputs/default_location/grid_location.gpkg
   out_dir: data/outputs/mall_site_qgis
   top_n: 15
 
@@ -65,9 +65,38 @@ steps:
       ALL_PARTS: 0
       OUTPUT: ${out_dir}/mall_candidates_raw.gpkg
 
+  - id: mall_top_centroids_wgs84
+    algorithm: native:reprojectlayer
+    params:
+      INPUT: ${mall_top_centroids.OUTPUT}
+      TARGET_CRS: EPSG:4326
+      OUTPUT: ${out_dir}/mall_candidates_wgs84.gpkg
+
+  - id: mall_candidate_lon
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${mall_top_centroids_wgs84.OUTPUT}
+      FIELD_NAME: LONGITUDE
+      FIELD_TYPE: 0
+      FIELD_LENGTH: 20
+      FIELD_PRECISION: 8
+      FORMULA: "round(x($geometry), 8)"
+      OUTPUT: ${out_dir}/mall_candidates_lon.gpkg
+
+  - id: mall_candidate_lat
+    algorithm: native:fieldcalculator
+    params:
+      INPUT: ${mall_candidate_lon.OUTPUT}
+      FIELD_NAME: LATITUDE
+      FIELD_TYPE: 0
+      FIELD_LENGTH: 20
+      FIELD_PRECISION: 8
+      FORMULA: "round(y($geometry), 8)"
+      OUTPUT: ${out_dir}/mall_candidates_latlon.gpkg
+
   - id: mall_candidates_final
     algorithm: native:retainfields
     params:
-      INPUT: ${mall_top_centroids.OUTPUT}
-      FIELDS: MALL_RANK;MALL_SCORE;MALL_CLASS;LOCATION_SCORE;LOCATION_LEVEL;ACCESS_NORM;HEAT_NORM;RD_NORM;SAFETY_NORM;SERVICE_NORM;NN_HubDist
+      INPUT: ${mall_candidate_lat.OUTPUT}
+      FIELDS: MALL_RANK;MALL_SCORE;MALL_CLASS;LONGITUDE;LATITUDE;LOCATION_SCORE;LOCATION_LEVEL;ACCESS_NORM;HEAT_NORM;RD_NORM;SAFETY_NORM;SERVICE_NORM;NN_HubDist
       OUTPUT: ${out_dir}/mall_candidates.gpkg

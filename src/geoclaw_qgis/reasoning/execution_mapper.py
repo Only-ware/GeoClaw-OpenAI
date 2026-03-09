@@ -42,15 +42,15 @@ def map_execution_plan(
     if task_type == "site_selection":
         if any(x in query_l for x in ("mall", "shopping", "商场", "商业")):
             return ExecutionPlan(
-                route_target="skill",
-                command=["skill", "--", "--skill", "mall_site_selection_qgis", "--skip-download"],
+                route_target="run",
+                command=["run", "--case", "site_selection"],
                 alternatives=[
+                    ["skill", "--", "--skill", "mall_site_selection_qgis", "--skip-download"],
                     ["skill", "--", "--skill", "mall_site_selection_llm"],
-                    ["run", "--case", "site_selection"],
                 ],
                 safe_to_execute=True,
                 blocking_reasons=[],
-                rationale=rationale + ["Mall-like site selection favors registered QGIS skill for reproducibility."],
+                rationale=rationale + ["Mall-like request mapped to city-agnostic site-selection run workflow first."],
             )
         return ExecutionPlan(
             route_target="run",

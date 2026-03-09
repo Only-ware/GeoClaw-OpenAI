@@ -1,4 +1,4 @@
-# GeoClaw 原生案例与 Skill 扩展（v3.1.1）
+# GeoClaw 原生案例与 Skill 扩展（v3.1.2）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
@@ -38,12 +38,15 @@ geoclaw-openai run --case site_selection --data-dir data/raw/wuhan_osm --skip-do
 
 注册表：`configs/skills_registry.json`
 
+快速上手：`docs/analysis-skills-quickstart.md`
+
 内置类型：
 
 - `pipeline`：执行空间流程
 - `ai`：调用外部 AI API
+- `builtin`：调用 GeoClaw 内置命令（`run/operator/network/reasoning`）
 
-路由策略（v3.1.1）：
+路由策略（v3.1.2）：
 
 - `soul.md` 定义默认执行层级（优先注册 Skill，再到 QGIS 算子）。
 - `user.md` 提供工具与输出偏好（如偏好 QGIS 可复现流程）。
@@ -61,6 +64,18 @@ geoclaw-openai skill -- --skill mall_site_selection_qgis --skip-download
 
 # 新增：商场选址（LLM）
 geoclaw-openai skill -- --skill mall_site_selection_llm --ai-input "基于武汉区位指标给出商场选址策略"
+
+# QGIS 矢量基础能力（pipeline）
+geoclaw-openai skill -- --skill vector_basics_qgis --set raw_dir=data/raw/wuhan_osm --set out_dir=data/outputs/demo_vector
+
+# QGIS 栅格基础能力（pipeline）
+geoclaw-openai skill -- --skill raster_basics_qgis --set raw_dir=data/raw/wuhan_osm --set out_dir=data/outputs/demo_raster
+
+# QGIS 通用算子（builtin）
+geoclaw-openai skill -- --skill qgis_operator_skill --args "--algorithm native:buffer --params-file configs/examples/operator_buffer_params.yaml"
+
+# 轨迹网络（builtin）
+geoclaw-openai skill -- --skill network_trackintel_skill --args "--pfs-csv data/examples/trajectory/trackintel_demo_pfs.csv --out-dir data/outputs/network_trackintel_skill_demo"
 ```
 
 ## 4. AI Provider 支持

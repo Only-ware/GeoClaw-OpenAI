@@ -78,6 +78,21 @@ class TestNLIntent(unittest.TestCase):
         self.assertIn("景德镇市", plan.cli_args)
         self.assertIn("site_selection", plan.cli_args)
 
+    def test_generic_city_detection_for_any_city(self) -> None:
+        plan = parse_nl_query("请在南京市做商场选址分析，前8个")
+        self.assertEqual(plan.intent, "run")
+        self.assertIn("--city", plan.cli_args)
+        self.assertIn("南京市", plan.cli_args)
+        self.assertIn("--top-n", plan.cli_args)
+        self.assertIn("8", plan.cli_args)
+
+    def test_no_hardcoded_city_fallback_when_source_missing(self) -> None:
+        plan = parse_nl_query("做一个选址分析，给出前5个")
+        self.assertEqual(plan.intent, "run")
+        self.assertIn("site_selection", plan.cli_args)
+        self.assertNotIn("武汉市", plan.cli_args)
+        self.assertNotIn("--city", plan.cli_args)
+
 
 if __name__ == "__main__":
     unittest.main()
