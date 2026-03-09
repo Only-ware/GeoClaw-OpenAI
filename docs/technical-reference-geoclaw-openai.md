@@ -46,7 +46,8 @@ AI-Agents/
 主入口：`src/geoclaw_qgis/cli/main.py`
 
 - 配置：`onboard`、`config show`、`config set`、`env`
-- 执行：`run`、`operator`、`network`、`skill`
+- 执行：`run`、`operator`、`network`、`skill`、`local`
+- 交互：`chat`
 - profile：`profile init/show/evolve`
 - 记忆：`memory status/short/long/review/archive/search`
 - 智能入口：`nl`
@@ -125,6 +126,7 @@ AI-Agents/
 - 将自然语言请求解析为 CLI 参数计划（`NLPlan`）
 - 默认预览，`--execute` 执行
 - 支持 profile 更新意图：自然语言可路由到 `profile evolve`
+- 支持 chat/local 意图：可路由到闲聊模式与本地工具执行命令
 - 在 `cmd_nl` 增加通用约束保留层：若用户显式给出关键参数，SRE 路由后会二次约束，防止参数丢失或错误改写
   - `run`：保留 `--city/--bbox/--data-dir/--top-n/--with-maps/...`
   - `network`：保留 `--pfs-csv/--out-dir/...`
@@ -179,6 +181,12 @@ geoclaw-openai operator --algorithm native:buffer --params-file configs/examples
 # 自然语言
 geoclaw-openai nl "用武汉市做选址分析，前20个，出图" --execute
 geoclaw-openai nl "商场选址分析，优先可复现QGIS流程" --use-sre --sre-report-out data/outputs/reasoning/nl_e2e_report.md
+
+# 闲聊模式
+geoclaw-openai chat --message "我运行失败了，下一步怎么排查？" --no-ai
+
+# 本地工具调用
+geoclaw-openai local --cmd "qgis_process --version" --timeout 30
 
 # 记忆
 geoclaw-openai memory archive --before-days 7

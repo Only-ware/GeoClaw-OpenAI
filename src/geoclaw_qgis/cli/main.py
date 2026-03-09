@@ -9,8 +9,10 @@ import re
 import shlex
 import subprocess
 import sys
+import time
 from pathlib import Path
 
+from geoclaw_qgis.ai import ExternalAIClient, ExternalAIConfig
 from geoclaw_qgis.analysis import TrackintelIntegrationError, TrackintelNetworkService
 from geoclaw_qgis.config import (
     bootstrap_runtime_env,
@@ -551,6 +553,150 @@ def cmd_profile_evolve(args: argparse.Namespace) -> int:
         )
     )
     return 0
+
+
+def _chat_suggestions(message: str) -> list[str]:
+    text = str(message or "").strip().lower()
+    suggestions = [
+        "如果是空间分析任务，可直接说：`武汉最适合建商场的前5个地点`。",
+        "如需查看可执行命令，先用：`geoclaw-openai nl \"你的问题\"`（预览模式）。",
+        "如需直接运行，请加：`--execute`。",
+    ]
+    if any(k in text for k in ("报错", "error", "失败", "无法", "can't", "cannot")):
+        suggestions.insert(0, "先提供报错原文、输入数据路径、你执行的完整命令，我会给出逐步修复方案。")
+    if any(k in text for k in ("命令", "shell", "tool", "工具")):
+        suggestions.append("如需调用本地命令：`geoclaw-openai local --cmd \"<your command>\"`。")
+    return suggestions
+
+
+def _fallback_chat_reply(message: str) -> str:
+    text = str(message or "").strip()
+    if not text:
+        return "请告诉我你的目标，我可以协助你规划 GeoClaw 工作流。"
+    if any(k in text.lower() for k in ("报错", "error", "失败", "无法", "can't", "cannot")):
+        return "我暂时无法直接定位全部上下文。建议先提供报错堆栈、输入路径和执行命令，我会给你可执行的修复步骤。"
+    if any(k in text for k in ("你好", "您好")):
+        return "你好，我可以闲聊，也可以帮你把需求转成可执行的 GeoClaw 命令。"
+    return "我理解你的问题。若当前信息不足以直接执行，我会先给出可落地的下一步建议。"
+
+
+def _chat_response_payload(*, message: str, session: SessionProfile, prefer_ai: bool = True) -> dict[str, object]:
+    reply = ""
+    mode = "fallback"
+    ai_error = ""
+    if prefer_ai:
+        try:
+            cfg = ExternalAIConfig.from_env()
+            client = ExternalAIClient(cfg)
+            system_prompt = (
+                "You are GeoClaw chat assistant. "
+                "Chat naturally and keep concise. "
+                "If user request cannot be solved directly, provide actionable alternatives."
+            )
+            user_prompt = (
+                f"User message: {message}\n"
+                f"Preferred language: {session.user.preferred_language}\n"
+                f"Preferred tone: {session.user.preferred_tone}"
+            )
+            reply = client.chat(user_prompt, system_prompt=system_prompt)
+            mode = "ai"
+        except Exception as exc:
+            ai_error = str(exc)
+    if not reply.strip():
+        reply = _fallback_chat_reply(message)
+    payload: dict[str, object] = {
+        "mode": mode,
+        "reply": reply,
+        "suggestions": _chat_suggestions(message),
+    }
+    if ai_error:
+        payload["ai_warning"] = "AI response unavailable; fallback response is used."
+    return payload
+
+
+def cmd_chat(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    session = get_session_profile()
+    message_opt = str(getattr(args, "message_opt", "") or "").strip()
+    message_pos = " ".join(getattr(args, "message", []) or []).strip()
+    message = message_opt or message_pos
+    if not message:
+        raise ValueError("chat message is required")
+    prefer_ai = not bool(getattr(args, "no_ai", False))
+    if bool(getattr(args, "with_ai", False)):
+        prefer_ai = True
+
+    payload = {
+        "message": message,
+        "chat": _chat_response_payload(message=message, session=session, prefer_ai=prefer_ai),
+        "profile_layers": {
+            "soul_path": session.soul_path,
+            "user_path": session.user_path,
+        },
+    }
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_local(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    command_text = str(args.cmd or "").strip()
+    if not command_text:
+        raise ValueError("--cmd is required")
+    cwd_text = str(args.cwd or "").strip()
+    workdir = Path(cwd_text).expanduser().resolve() if cwd_text else Path.cwd().resolve()
+    if not workdir.exists() or not workdir.is_dir():
+        raise ValueError(f"--cwd is not a valid directory: {workdir}")
+
+    start_ts = time.time()
+    timed_out = False
+    try:
+        if bool(args.shell):
+            proc = subprocess.run(
+                command_text,
+                cwd=str(workdir),
+                shell=True,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=max(1, int(args.timeout)),
+            )
+        else:
+            cmd = shlex.split(command_text)
+            if not cmd:
+                raise ValueError("--cmd produced empty token list")
+            proc = subprocess.run(
+                cmd,
+                cwd=str(workdir),
+                shell=False,
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=max(1, int(args.timeout)),
+            )
+        return_code = int(proc.returncode)
+        stdout = proc.stdout or ""
+        stderr = proc.stderr or ""
+    except subprocess.TimeoutExpired as exc:
+        timed_out = True
+        return_code = 124
+        stdout = str(exc.stdout or "")
+        stderr = str(exc.stderr or "")
+
+    elapsed = round(time.time() - start_ts, 3)
+    payload = {
+        "command": command_text,
+        "cwd": str(workdir),
+        "shell": bool(args.shell),
+        "timeout": int(args.timeout),
+        "timed_out": timed_out,
+        "return_code": return_code,
+        "elapsed_seconds": elapsed,
+        "stdout": stdout,
+        "stderr": stderr,
+    }
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return int(return_code)
 
 
 def resolve_workspace_root() -> Path:
@@ -1125,6 +1271,25 @@ def cmd_nl(args: argparse.Namespace) -> int:
 
     session = get_session_profile()
     plan: NLPlan = parse_nl_query(query_text, session=session)
+    if plan.intent == "chat":
+        chat_payload = _chat_response_payload(message=query_text, session=session, prefer_ai=True)
+        payload = {
+            "query": plan.query,
+            "intent": plan.intent,
+            "confidence": plan.confidence,
+            "reasons": plan.reasons,
+            "command_preview": "geoclaw-openai chat --message " + query_text,
+            "cli_args": ["chat", "--message", query_text],
+            "chat": chat_payload,
+            "profile_layers": {
+                "soul_path": session.soul_path,
+                "user_path": session.user_path,
+            },
+            "execute": False,
+        }
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+
     routed_cli_args = list(plan.cli_args)
     route_notes: list[str] = []
     sre_input_data = None
@@ -1686,6 +1851,20 @@ def build_parser() -> argparse.ArgumentParser:
     network.add_argument("--dry-run", action="store_true", help="only print resolved parameters")
     network.set_defaults(func=cmd_network)
 
+    local = sub.add_parser("local", help="run any local tool/command")
+    local.add_argument("--cmd", required=True, help='command text, e.g. "ls -la"')
+    local.add_argument("--cwd", default="", help="optional working directory")
+    local.add_argument("--timeout", type=int, default=120, help="command timeout seconds")
+    local.add_argument("--shell", action="store_true", help="run command through shell")
+    local.set_defaults(func=cmd_local)
+
+    chat = sub.add_parser("chat", help="chat mode with fallback suggestions")
+    chat.add_argument("message", nargs="*", help="chat message text")
+    chat.add_argument("--message", dest="message_opt", default="", help="chat message text (option form)")
+    chat.add_argument("--with-ai", action="store_true", help="prefer AI response if provider is configured")
+    chat.add_argument("--no-ai", action="store_true", help="force fallback response without AI call")
+    chat.set_defaults(func=cmd_chat)
+
     reasoning = sub.add_parser("reasoning", help="run Spatial Reasoning Engine (internal)")
     reasoning.add_argument("query", nargs="+", help="reasoning query text")
     reasoning.add_argument("--datasets-file", default="", help="JSON datasets payload file")
@@ -1748,7 +1927,7 @@ def build_parser() -> argparse.ArgumentParser:
     mem_search.add_argument("--min-score", type=float, default=0.15, help="minimum similarity score")
     mem_search.set_defaults(func=cmd_memory_search)
 
-    nl = sub.add_parser("nl", help="run geoclaw-openai from natural language")
+    nl = sub.add_parser("nl", help="run geoclaw-openai from natural language (run/operator/network/skill/memory/update/profile/chat/local)")
     nl.add_argument("query", nargs="+", help="natural language request text")
     nl.add_argument("--use-sre", action="store_true", help="use SRE for gray-route planning")
     nl.add_argument("--sre-strict", action="store_true", help="fail when SRE validation status is fail")

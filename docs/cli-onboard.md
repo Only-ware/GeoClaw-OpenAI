@@ -139,6 +139,12 @@ geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 geoclaw-openai nl "商场选址分析，优先可复现工作流" --execute
 geoclaw-openai nl "商场选址分析，优先可复现QGIS流程" --use-sre --sre-report-out data/outputs/reasoning/nl_e2e_report.md
 
+# 闲聊 / 建议模式
+geoclaw-openai chat --message "我运行失败了，下一步怎么排查？" --no-ai
+
+# 本地工具执行
+geoclaw-openai local --cmd "qgis_process --version" --timeout 30
+
 # TrackIntel 轨迹网络
 geoclaw-openai network \
   --pfs-csv data/examples/trajectory/trackintel_demo_pfs.csv \

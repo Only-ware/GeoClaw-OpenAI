@@ -96,7 +96,7 @@ geoclaw-openai nl "用武汉市做选址分析，前20个，出图"
 geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 ```
 
-当前支持解析到：`run`、`operator`、`network`、`skill`、`memory`、`update`。
+当前支持解析到：`run`、`operator`、`network`、`skill`、`memory`、`update`、`profile`、`chat`、`local`。
 
 ## 7. AI Provider 与上下文压缩
 

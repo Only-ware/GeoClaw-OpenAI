@@ -13,6 +13,42 @@ TOPN_RE = re.compile(r"(?:top\s*[-_ ]?n|前)\s*(\d{1,4})", re.IGNORECASE)
 PATH_HINT_RE = re.compile(r"([~./\\A-Za-z0-9_\-]+/[A-Za-z0-9_\-./\\]+)")
 CITY_EXPLICIT_RE = re.compile(r"(?:city|城市)\s*[:：]?\s*([A-Za-z\u4e00-\u9fff]{2,20})", re.IGNORECASE)
 CITY_CN_RE = re.compile(r"(?:^|[^\u4e00-\u9fff])([\u4e00-\u9fff]{2,12}市)(?:[^\u4e00-\u9fff]|$)")
+BACKTICK_RE = re.compile(r"`([^`]+)`")
+LOCAL_CMD_INLINE_RE = re.compile(
+    r"(?:执行(?:本地)?命令|运行(?:本地)?命令|run\s+local\s+cmd|run\s+command|shell)\s*[:：]?\s*(.+)$",
+    re.IGNORECASE,
+)
+CHAT_KEYWORDS = (
+    "你好",
+    "您好",
+    "hi",
+    "hello",
+    "hey",
+    "谢谢",
+    "thank",
+    "闲聊",
+    "聊天",
+)
+SPATIAL_HINTS = (
+    "run",
+    "skill",
+    "operator",
+    "network",
+    "reasoning",
+    "bbox",
+    "city",
+    "城市",
+    "区位",
+    "选址",
+    "地图",
+    "出图",
+    "轨迹",
+    "od",
+    "trackintel",
+    "analysis",
+    "spatial",
+    "qgis",
+)
 
 
 @dataclass
@@ -129,6 +165,61 @@ def _build_update_plan(query: str, text_lower: str, session: SessionProfile | No
         cli_args.append("--check-only")
         reasons.append("Using check-only mode.")
     return NLPlan(query=query, intent="update", confidence=0.97, reasons=reasons, cli_args=cli_args)
+
+
+def _extract_local_command(text: str) -> str:
+    raw = str(text or "").strip()
+    if not raw:
+        return ""
+    if raw.startswith("!"):
+        return raw[1:].strip()
+    if raw.lower().startswith("/tool "):
+        return raw[6:].strip()
+
+    match = BACKTICK_RE.search(raw)
+    if match:
+        return match.group(1).strip()
+
+    inline = LOCAL_CMD_INLINE_RE.search(raw)
+    if inline:
+        return inline.group(1).strip().rstrip("。；;")
+    return ""
+
+
+def _build_local_tool_plan(query: str, text: str, session: SessionProfile | None = None) -> NLPlan:
+    reasons = ["Detected local-tool execution request."]
+    _append_profile_reasons(reasons, session)
+    cmd = _extract_local_command(text)
+    if not cmd:
+        reasons.append("Command not parsed from NL text; fallback to chat.")
+        return _build_chat_plan(query, text, session, extra_reasons=reasons)
+    reasons.append(f"Parsed local command={cmd}.")
+    return NLPlan(
+        query=query,
+        intent="local",
+        confidence=0.91,
+        reasons=reasons,
+        cli_args=["local", "--cmd", cmd],
+    )
+
+
+def _build_chat_plan(
+    query: str,
+    text: str,
+    session: SessionProfile | None = None,
+    *,
+    extra_reasons: list[str] | None = None,
+) -> NLPlan:
+    reasons = list(extra_reasons or [])
+    reasons.append("Routed to chat mode.")
+    _append_profile_reasons(reasons, session)
+    return NLPlan(
+        query=query,
+        intent="chat",
+        confidence=0.78,
+        reasons=reasons,
+        cli_args=["chat", "--message", text],
+    )
 
 
 def _build_profile_plan(query: str, text: str, text_lower: str, session: SessionProfile | None = None) -> NLPlan:
@@ -360,6 +451,8 @@ def parse_nl_query(query: str, session: SessionProfile | None = None) -> NLPlan:
         raise ValueError("empty natural-language query")
     text_lower = text.lower()
 
+    if _contains_any(text_lower, ("执行命令", "运行命令", "local tool", "本地工具", "shell", "/tool ", "terminal")) or text.startswith("!"):
+        return _build_local_tool_plan(text, text, session)
     if _contains_any(text_lower, ("profile", "user.md", "soul.md", "用户画像", "偏好", "系统边界", "行为边界")) and _contains_any(
         text_lower, ("更新", "修改", "同步", "写入", "evolve", "update", "adjust", "调整")
     ):
@@ -374,4 +467,9 @@ def parse_nl_query(query: str, session: SessionProfile | None = None) -> NLPlan:
         return _build_network_plan(text, text, text_lower, session)
     if _contains_any(text_lower, ("operator", "算子", "buffer", "缓冲", "单算法")):
         return _build_operator_plan(text, text, text_lower, session)
+    if _contains_any(text_lower, CHAT_KEYWORDS):
+        return _build_chat_plan(text, text, session)
+    if not _contains_any(text_lower, SPATIAL_HINTS):
+        if not _detect_bbox(text) and not _detect_data_dir(text) and not _detect_city(text, text_lower):
+            return _build_chat_plan(text, text, session)
     return _build_run_plan(text, text, text_lower, session)

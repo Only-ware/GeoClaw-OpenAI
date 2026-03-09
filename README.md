@@ -84,6 +84,8 @@ geoclaw-openai skill-registry register --spec-file configs/examples/new_skill.js
 - 区位分析、选址分析、武汉综合案例（含聚类）
 - 批量专题图导出（PNG）+ QGIS 工程文件（QGZ）
 - 自然语言操作（`geoclaw-openai nl`）
+- 闲聊模式（`geoclaw-openai chat`）+ 无法直接解决时的建议方案
+- 本地工具调用（`geoclaw-openai local --cmd ...`）
 - 空间推理引擎（`geoclaw-openai reasoning` + `nl --use-sre`）
 - Skill 扩展（`pipeline` / `ai`）
 - Memory 任务闭环（短期 + 长期复盘）
@@ -383,13 +385,37 @@ geoclaw-openai reasoning "评估武汉商场选址可达性与服务覆盖" \
 bash data/examples/site_selection/wuhan_mall_top5/run_nl_wuhan_mall_top5.sh
 ```
 
-当前 NL 覆盖：`run` / `operator` / `network` / `skill` / `memory` / `update` / `profile`。
+当前 NL 覆盖：`run` / `operator` / `network` / `skill` / `memory` / `update` / `profile` / `chat` / `local`。
 在 v3.1.0 中，NL 规划会读取 `soul.md/user.md`，并在商场选址等场景触发注册 Skill 优先路由。  
 同时支持通过自然语言触发 profile 更新（会路由到 `profile evolve`）。
 启用 SRE 时可用：
 - `--sre-report-out`：输出 Markdown 推理报告（必须在 `data/outputs` 下）
 - `--sre-print-report`：输出 JSON 后打印报告正文
 - 通用路由约束：当用户在自然语言中显式给出关键参数（如 `run` 的 `city/bbox/data-dir/top-n`、`network` 的 `out-dir`、`operator` 的参数列表）时，CLI 会在 SRE 之后执行参数保留，避免错误改写导致的路由偏移。
+
+闲聊与建议模式：
+
+```bash
+# 直接闲聊（优先 AI，失败时自动 fallback）
+geoclaw-openai chat --message "你好，给我一个今天的分析计划"
+
+# 通过 NL 自动进入闲聊模式
+geoclaw-openai nl "你好，我们先聊聊需求"
+
+# 当问题暂时无法解决时，返回可执行建议
+geoclaw-openai chat --message "我运行失败了，下一步怎么排查？" --no-ai
+```
+
+本地工具调用：
+
+```bash
+# 预览（NL）
+geoclaw-openai nl "执行命令: ls -la"
+
+# 直接执行本地命令
+geoclaw-openai local --cmd "ls -la"
+geoclaw-openai local --cmd "qgis_process --version" --timeout 30
+```
 
 Profile 更新示例：
 
@@ -513,6 +539,8 @@ geoclaw-openai network --help
 geoclaw-openai skill -- --help
 geoclaw-openai memory --help
 geoclaw-openai nl --help
+geoclaw-openai chat --help
+geoclaw-openai local --help
 geoclaw-openai profile --help
 geoclaw-openai update --help
 ```
@@ -561,7 +589,7 @@ Profile layers：
 
 当前版本 `v3.1.0` 已通过本地回归：
 
-- 单元测试：`python3 -m unittest discover -s src/geoclaw_qgis/tests`（82/82 通过）
+- 单元测试：`python3 -m unittest discover -s src/geoclaw_qgis/tests`（88/88 通过）
 - 全链路日常回归：`bash scripts/day_run.sh`（success）
 - 复杂自然语言端到端回归：`bash scripts/e2e_complex_nl_suite.sh`（4/4 场景 success）
 

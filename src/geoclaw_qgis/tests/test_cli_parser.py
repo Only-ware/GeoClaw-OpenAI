@@ -43,6 +43,19 @@ class TestCLIParser(unittest.TestCase):
         self.assertIn("preferred_language=Chinese", args.set_items)
         self.assertIn("preferred_tools=QGIS,Ollama", args.add_items)
 
+    def test_chat_command_exists(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["chat", "--message", "你好"])
+        self.assertEqual(args.command, "chat")
+        self.assertEqual(args.message_opt, "你好")
+
+    def test_local_command_exists(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["local", "--cmd", "ls -la", "--timeout", "10"])
+        self.assertEqual(args.command, "local")
+        self.assertEqual(args.cmd, "ls -la")
+        self.assertEqual(args.timeout, 10)
+
     def test_nl_sre_flags(self) -> None:
         parser = build_parser()
         args = parser.parse_args(

@@ -58,6 +58,19 @@ class TestNLIntent(unittest.TestCase):
         self.assertIn("--add", plan.cli_args)
         self.assertIn("preferred_tools=Ollama", plan.cli_args)
 
+    def test_chat_intent_for_greeting(self) -> None:
+        plan = parse_nl_query("你好，今天怎么样")
+        self.assertEqual(plan.intent, "chat")
+        self.assertEqual(plan.cli_args[0], "chat")
+        self.assertIn("--message", plan.cli_args)
+
+    def test_local_tool_intent(self) -> None:
+        plan = parse_nl_query("执行命令: ls -la")
+        self.assertEqual(plan.intent, "local")
+        self.assertEqual(plan.cli_args[0], "local")
+        self.assertIn("--cmd", plan.cli_args)
+        self.assertIn("ls -la", plan.cli_args)
+
 
 if __name__ == "__main__":
     unittest.main()

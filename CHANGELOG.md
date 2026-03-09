@@ -2,6 +2,20 @@
 
 All notable changes to this project are documented in this file.
 
+## [Unreleased]
+
+### Added
+- Added chat mode command:
+  - `geoclaw-openai chat --message "..."`
+  - Returns fallback suggestions when direct resolution is not possible.
+- Added local tool command:
+  - `geoclaw-openai local --cmd "<command>"`
+  - Supports timeout/cwd/shell options.
+- Added NL intent routing for:
+  - `chat`
+  - `local` (e.g., "执行命令 ...").
+- Added tests for chat/local parser and command execution smoke.
+
 ## [3.1.0] - 2026-03-08
 
 ### Added
