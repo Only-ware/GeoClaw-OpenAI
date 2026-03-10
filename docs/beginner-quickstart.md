@@ -42,7 +42,7 @@ source ~/.geoclaw-openai/env.sh
 `onboard` 会引导你配置：
 
 - AI provider（OpenAI / Qwen / Gemini / Ollama）
-- API Key（v3.1.2 起输入为可见模式，重配时提示脱敏 key 片段）
+- API Key（v3.1.3 起输入为可见模式，重配时提示脱敏 key 片段）
 - 默认模型
 - 默认 bbox
 

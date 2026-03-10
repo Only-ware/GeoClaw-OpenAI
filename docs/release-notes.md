@@ -1,5 +1,26 @@
 # GeoClaw-OpenAI Release Notes
 
+## v3.1.3 (2026-03-10)
+
+主要迭代：
+
+1. OpenClaw Skill 兼容接入
+   - 新增命令：`geoclaw-openai skill-registry import-openclaw`
+   - 支持 OpenClaw 风格 JSON/YAML Skill 描述导入，自动转换为 GeoClaw `pipeline/ai/builtin` 结构。
+   - 导入后复用 GeoClaw 安全评估规则与确认注册流程，默认阻断高风险 skill。
+
+2. 适配器与测试增强
+   - 新增适配模块：`src/geoclaw_qgis/skills/openclaw_adapter.py`
+   - 新增测试：
+     - `test_openclaw_adapter.py`
+     - `test_skill_registry_openclaw_import.py`
+   - CLI parser 增加 `import-openclaw` 子命令覆盖测试。
+
+3. 文档与示例同步
+   - 新增 OpenClaw 示例：`configs/examples/openclaw_skill_example.yaml`
+   - README、Skill 快速上手、Skill 规范文档补充导入示例。
+   - 包版本与运行时版本升级为 `3.1.3`。
+
 ## v3.1.2 (2026-03-09)
 
 主要迭代：

@@ -4,6 +4,25 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [3.1.3] - 2026-03-10
+
+### Added
+- Added OpenClaw-style skill import capability:
+  - `geoclaw-openai skill-registry import-openclaw`
+  - Converts OpenClaw JSON/YAML spec into GeoClaw `pipeline/ai/builtin` skill spec.
+  - Reuses existing skill safety assessment + user confirmation flow before registration.
+- Added OpenClaw sample spec:
+  - `configs/examples/openclaw_skill_example.yaml`
+
+### Changed
+- Bumped project/package runtime version to `3.1.3`.
+- Updated README/docs with OpenClaw import usage examples.
+- Updated CLI parser and skill docs to include `import-openclaw`.
+
+### Tested
+- `python3 -m unittest discover -s src/geoclaw_qgis/tests` (105 tests, pass).
+- `python3 -m geoclaw_qgis.cli.main skill-registry import-openclaw --spec-file configs/examples/openclaw_skill_example.yaml --id-prefix oc_ --dry-run` (pass).
+
 ## [3.1.2] - 2026-03-09
 
 ### Added

@@ -1,0 +1,5 @@
+id: mall_site_selection_qgis
+type: command
+description: OpenClaw sample skill for mall site selection via QGIS run case
+command: "geoclaw-openai run --case site_selection --skip-download --top-n 5"
+report_path: data/outputs/openclaw_mall_site/pipeline_report.json

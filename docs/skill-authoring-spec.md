@@ -1,4 +1,4 @@
-# GeoClaw Skill 编写规范（项目 v3.1.2，规范 v1.0）
+# GeoClaw Skill 编写规范（项目 v3.1.3，规范 v1.0）
 
 本文档定义 GeoClaw-OpenAI 项目中的 skill 编写要求，适用于 `configs/skills_registry.json` 中的 `pipeline`、`ai` 与 `builtin` 类型。
 
@@ -140,6 +140,15 @@ geoclaw-openai skill-registry assess --spec-file configs/examples/new_skill.json
 geoclaw-openai skill-registry register \
   --spec-file configs/examples/new_skill.json \
   --confirm
+```
+
+OpenClaw 风格 Skill 可先做兼容导入：
+
+```bash
+geoclaw-openai skill-registry import-openclaw \
+  --spec-file configs/examples/openclaw_skill_example.yaml \
+  --id-prefix oc_ \
+  --dry-run
 ```
 
 规则：

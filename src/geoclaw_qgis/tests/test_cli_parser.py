@@ -119,6 +119,25 @@ class TestCLIParser(unittest.TestCase):
         self.assertEqual(args.report_out, "data/outputs/reasoning/test_report.md")
         self.assertTrue(args.print_report)
 
+    def test_skill_registry_import_openclaw_exists(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "skill-registry",
+                "import-openclaw",
+                "--spec-file",
+                "configs/examples/openclaw_skill_example.yaml",
+                "--id-prefix",
+                "oc_",
+                "--dry-run",
+            ]
+        )
+        self.assertEqual(args.command, "skill-registry")
+        self.assertEqual(args.skill_registry_cmd, "import-openclaw")
+        self.assertEqual(args.spec_file, "configs/examples/openclaw_skill_example.yaml")
+        self.assertEqual(args.id_prefix, "oc_")
+        self.assertTrue(args.dry_run)
+
     def test_apply_sre_execution_plan_safe(self) -> None:
         base = ["run", "--case", "native_cases"]
         notes: list[str] = []

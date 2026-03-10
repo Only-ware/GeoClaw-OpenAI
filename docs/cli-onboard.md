@@ -1,4 +1,4 @@
-# GeoClaw CLI 安装与 Onboard（v3.1.2）
+# GeoClaw CLI 安装与 Onboard（v3.1.3）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
@@ -31,7 +31,7 @@ source ~/.geoclaw-openai/env.sh
 - `~/.geoclaw-openai/soul.md`
 - `~/.geoclaw-openai/user.md`
 
-交互输入说明（v3.1.2）：
+交互输入说明（v3.1.3）：
 - API Key 输入为可见模式，便于核对长 key。
 - 若已配置旧 key，提示中会展示脱敏片段（仅开头+结尾），回车可保持原值。
 

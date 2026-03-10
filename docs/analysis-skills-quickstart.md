@@ -1,4 +1,4 @@
-# GeoClaw 可直接用分析 Skill 快速上手（v3.1.2）
+# GeoClaw 可直接用分析 Skill 快速上手（v3.1.3）
 
 本文档面向新手，说明如何直接调用已注册的分析 Skill，并给出可复制命令。
 
@@ -101,3 +101,25 @@ geoclaw-openai skill-registry assess --spec-file configs/examples/new_skill.json
 - `docs/native-cases-and-skills.md`
 - `docs/skill-authoring-spec.md`
 - `docs/skill-case-mall-site-selection.md`
+
+## 8. OpenClaw Skill 接入（兼容导入）
+
+GeoClaw 支持把 OpenClaw 风格的 Skill 描述（JSON/YAML）转换为本地 Skill 并注册。
+
+```bash
+# 仅转换+评估（不写入注册表）
+geoclaw-openai skill-registry import-openclaw \
+  --spec-file configs/examples/openclaw_skill_example.yaml \
+  --id-prefix oc_ \
+  --dry-run
+
+# 转换+注册（含确认）
+geoclaw-openai skill-registry import-openclaw \
+  --spec-file configs/examples/openclaw_skill_example.yaml \
+  --id-prefix oc_ \
+  --confirm
+```
+
+说明：
+- 导入后仍会经过 GeoClaw 安全评估规则。
+- OpenClaw `command` 会被映射为 GeoClaw `builtin`（仅允许 `run/operator/network/reasoning`）。

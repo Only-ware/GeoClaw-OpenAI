@@ -43,7 +43,12 @@ from geoclaw_qgis.reasoning.data_catalog_adapter import (
 from geoclaw_qgis.reasoning.input_adapter import build_reasoning_input_from_profile
 from geoclaw_qgis.reasoning.report_generator import render_reasoning_report
 from geoclaw_qgis.security import OutputSecurityError, fixed_output_root, validate_output_targets
-from geoclaw_qgis.skills import assess_skill_spec, load_skill_spec_file, upsert_skill_registry
+from geoclaw_qgis.skills import (
+    assess_skill_spec,
+    load_openclaw_skill_spec,
+    load_skill_spec_file,
+    upsert_skill_registry,
+)
 
 
 DEFAULT_BBOX = "30.50,114.20,30.66,114.45"
@@ -1571,6 +1576,40 @@ def _resolve_registry_path(path_text: str) -> Path:
     return path
 
 
+def _confirm_skill_registration(*, confirmed_flag: bool) -> bool:
+    confirmed = bool(confirmed_flag)
+    if confirmed:
+        return True
+    if not sys.stdin.isatty():
+        raise ValueError("--confirm is required in non-interactive mode.")
+    answer = input("Assessment complete. Type YES to confirm registration: ").strip()
+    return answer == "YES"
+
+
+def _assert_skill_risk_allowed(
+    *,
+    assessment: dict[str, object],
+    allow_high_risk: bool,
+    blocked_action: str,
+    spec_file: Path,
+    registry_path: Path,
+) -> None:
+    if assessment.get("risk_level") == "high" and not allow_high_risk:
+        _append_skill_guard_log(
+            {
+                "action": blocked_action,
+                "spec_file": str(spec_file),
+                "registry": str(registry_path),
+                "assessment": assessment,
+                "reason": "high_risk_requires_allow_high_risk",
+            }
+        )
+        raise RuntimeError(
+            "Skill assessment risk_level=high. Registration blocked. "
+            "Review findings and use --allow-high-risk with explicit confirmation if you still want to proceed."
+        )
+
+
 def cmd_skill_registry_assess(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
     root = resolve_workspace_root()
@@ -1602,28 +1641,15 @@ def cmd_skill_registry_register(args: argparse.Namespace) -> int:
     assessment = assess_skill_spec(spec, workspace_root=root)
     registry_path = _resolve_registry_path(args.registry)
 
-    if assessment.get("risk_level") == "high" and not args.allow_high_risk:
-        _append_skill_guard_log(
-            {
-                "action": "register_blocked",
-                "spec_file": str(spec_path),
-                "registry": str(registry_path),
-                "assessment": assessment,
-                "reason": "high_risk_requires_allow_high_risk",
-            }
-        )
-        raise RuntimeError(
-            "Skill assessment risk_level=high. Registration blocked. "
-            "Review findings and use --allow-high-risk with explicit confirmation if you still want to proceed."
-        )
+    _assert_skill_risk_allowed(
+        assessment=assessment,
+        allow_high_risk=bool(args.allow_high_risk),
+        blocked_action="register_blocked",
+        spec_file=spec_path,
+        registry_path=registry_path,
+    )
 
-    confirmed = bool(args.confirm)
-    if not confirmed:
-        if not sys.stdin.isatty():
-            raise ValueError("--confirm is required in non-interactive mode.")
-        prompt = "Assessment complete. Type YES to confirm registration: "
-        answer = input(prompt).strip()
-        confirmed = answer == "YES"
+    confirmed = _confirm_skill_registration(confirmed_flag=bool(args.confirm))
     if not confirmed:
         print(json.dumps({"registered": False, "reason": "user_not_confirmed", "assessment": assessment}, ensure_ascii=False, indent=2))
         return 1
@@ -1637,6 +1663,55 @@ def cmd_skill_registry_register(args: argparse.Namespace) -> int:
         "result": result,
     }
     _append_skill_guard_log({"action": "register", **payload})
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return 0
+
+
+def cmd_skill_registry_import_openclaw(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    root = resolve_workspace_root()
+    spec_path = Path(args.spec_file).expanduser().resolve()
+    if not spec_path.exists():
+        raise FileNotFoundError(f"openclaw spec file not found: {spec_path}")
+
+    spec = load_openclaw_skill_spec(spec_path, id_prefix=str(args.id_prefix or "openclaw_"))
+    assessment = assess_skill_spec(spec, workspace_root=root)
+    registry_path = _resolve_registry_path(args.registry)
+    payload: dict[str, object] = {
+        "imported": True,
+        "source": "openclaw",
+        "spec_file": str(spec_path),
+        "registry": str(registry_path),
+        "workspace": str(root),
+        "converted_spec": spec,
+        "assessment": assessment,
+    }
+
+    if bool(args.dry_run):
+        payload["registered"] = False
+        payload["dry_run"] = True
+        _append_skill_guard_log({"action": "import_openclaw_dry_run", **payload})
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 0
+
+    _assert_skill_risk_allowed(
+        assessment=assessment,
+        allow_high_risk=bool(args.allow_high_risk),
+        blocked_action="import_openclaw_blocked",
+        spec_file=spec_path,
+        registry_path=registry_path,
+    )
+    confirmed = _confirm_skill_registration(confirmed_flag=bool(args.confirm))
+    if not confirmed:
+        payload["registered"] = False
+        payload["reason"] = "user_not_confirmed"
+        print(json.dumps(payload, ensure_ascii=False, indent=2))
+        return 1
+
+    result = upsert_skill_registry(registry_path, skill_spec=spec, replace=bool(args.replace))
+    payload["registered"] = True
+    payload["result"] = result
+    _append_skill_guard_log({"action": "import_openclaw", **payload})
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return 0
 
@@ -1868,6 +1943,23 @@ def build_parser() -> argparse.ArgumentParser:
     skill_register.add_argument("--allow-high-risk", action="store_true", help="allow high-risk skill registration")
     skill_register.add_argument("--confirm", action="store_true", help="confirm registration without interactive prompt")
     skill_register.set_defaults(func=cmd_skill_registry_register)
+
+    skill_import_openclaw = skill_registry_sub.add_parser(
+        "import-openclaw",
+        help="import OpenClaw-style skill spec (JSON/YAML), assess, then register",
+    )
+    skill_import_openclaw.add_argument("--spec-file", required=True, help="OpenClaw skill spec JSON/YAML file")
+    skill_import_openclaw.add_argument("--registry", default="", help="target skills registry path")
+    skill_import_openclaw.add_argument("--id-prefix", default="openclaw_", help="prefix for imported skill id")
+    skill_import_openclaw.add_argument("--replace", action="store_true", help="replace existing skill id if exists")
+    skill_import_openclaw.add_argument(
+        "--allow-high-risk",
+        action="store_true",
+        help="allow high-risk skill registration",
+    )
+    skill_import_openclaw.add_argument("--confirm", action="store_true", help="confirm registration without prompt")
+    skill_import_openclaw.add_argument("--dry-run", action="store_true", help="only convert + assess, do not register")
+    skill_import_openclaw.set_defaults(func=cmd_skill_registry_import_openclaw)
 
     run = sub.add_parser("run", help="run built-in cases with city/bbox/local data")
     run.add_argument(

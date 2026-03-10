@@ -19,7 +19,7 @@ PDF_OUTPUT = ROOT / "GeoClaw-OpenAI_工程说明书.pdf"
 
 TITLE = "GeoClaw-OpenAI 工程说明书"
 SUBTITLE = "UrbanComp Lab @ China University of Geosciences (Wuhan)"
-VERSION = "3.1.2"
+VERSION = "3.1.3"
 TODAY = dt.date.today().isoformat()
 
 sections: list[tuple[str, list[str]]] = [
@@ -28,7 +28,7 @@ sections: list[tuple[str, list[str]]] = [
         [
             "GeoClaw-OpenAI 面向科研、教学与工程团队，提供可复现的 GIS+AI 全流程能力。",
             "项目目标是将数据获取、空间分析、制图表达、AI 解释、Skill 扩展与任务记忆闭环统一到单一 CLI。",
-            "v3.1.2 在 SRE+NL+Skill+Memory 稳定闭环基础上，补充可直接用分析 Skill 文档与示例。",
+            "v3.1.3 在 SRE+NL+Skill+Memory 稳定闭环基础上，新增 OpenClaw Skill 兼容导入能力。",
         ],
     ),
     (
@@ -68,16 +68,14 @@ sections: list[tuple[str, list[str]]] = [
         ],
     ),
     (
-        "5. 3.1.2 版本新增重点",
+        "5. 3.1.3 版本新增重点",
         [
-            "5.1 onboard API Key 交互改为可见输入；重配时显示脱敏 key 片段（开头/结尾）。",
-            "5.2 新增 chat --execute：可执行请求自动委派至 nl --execute，并支持 SRE 报告输出。",
-            "5.3 修复显式数据源路由：非武汉 city/bbox/data-dir 请求保持 native run，不被误改写。",
-            "5.4 chat 回退回复消费 soul/user 偏好（语言、语气、使命）并输出建议步骤。",
-            "5.5 新增景德镇聊天端到端案例（聊天过程 + 推理报告 + Top5 结果）供新手复现。",
-            "5.6 测试矩阵增强：覆盖 chat/local/parser/NL 路由与 key 脱敏行为。",
-            "5.7 新增可直接用分析 Skill 快速上手文档，并加入 README 快速入口。",
-            "5.8 版本与文档体系升级到 v3.1.2，并在 README 持续维护新手入口。",
+            "5.1 新增 skill-registry import-openclaw，用于导入 OpenClaw 风格 JSON/YAML skill 描述。",
+            "5.2 OpenClaw 描述可自动映射为 GeoClaw pipeline/ai/builtin 三类 skill。",
+            "5.3 导入流程复用安全评估与确认注册机制，high 风险默认阻断。",
+            "5.4 新增 OpenClaw 适配器与对应单元测试，覆盖转换与 dry-run 注册链路。",
+            "5.5 README/Skill 快速上手/规范文档补充 OpenClaw 接入示例。",
+            "5.6 包版本与运行时版本升级到 v3.1.3。",
         ],
     ),
     (

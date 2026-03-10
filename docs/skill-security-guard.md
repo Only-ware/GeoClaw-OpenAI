@@ -1,4 +1,4 @@
-# GeoClaw Skill 安全门禁说明（v3.1.2）
+# GeoClaw Skill 安全门禁说明（v3.1.3）
 
 GeoClaw 提供注册前安全评估流程，防止恶意或高危 skill 注入：
 
