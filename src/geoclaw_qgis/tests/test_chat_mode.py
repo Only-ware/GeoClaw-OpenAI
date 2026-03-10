@@ -8,6 +8,8 @@ import os
 import tempfile
 import unittest
 from contextlib import redirect_stdout
+from pathlib import Path
+from unittest.mock import patch
 
 from geoclaw_qgis.profile import ensure_profile_layers
 import geoclaw_qgis.profile.layers as profile_layers
@@ -125,6 +127,47 @@ class TestChatMode(unittest.TestCase):
             cli_main._SESSION_PROFILE = None
             profile_layers._PROFILE_CACHE = None
 
+    def test_chat_can_update_profile_and_hot_reload(self) -> None:
+        old_env = dict(os.environ)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                home = os.path.join(tmp, "home")
+                os.environ["GEOCLAW_OPENAI_HOME"] = home
+                ensure_profile_layers()
+                cli_main._SESSION_PROFILE = None
+                profile_layers._PROFILE_CACHE = None
+
+                args = argparse.Namespace(
+                    message=["请根据这次对话更新user.md偏好，偏好英文并详细"],
+                    message_opt="",
+                    with_ai=False,
+                    no_ai=True,
+                    execute=False,
+                    use_sre=False,
+                    sre_report_out="",
+                    interactive=False,
+                    session_id="",
+                    new_session=False,
+                    max_history_turns=8,
+                )
+                buf = io.StringIO()
+                with redirect_stdout(buf):
+                    rc = cli_main.cmd_chat(args)
+                self.assertEqual(rc, 0)
+                payload = json.loads(buf.getvalue())
+                self.assertEqual(payload.get("intent"), "profile")
+                profile_update = payload.get("profile_update") or {}
+                self.assertTrue(profile_update.get("applied"))
+                profile_after = profile_update.get("profile") or {}
+                user_after = profile_after.get("user") or {}
+                self.assertEqual(user_after.get("preferred_language"), "English")
+                self.assertEqual(user_after.get("preferred_tone"), "detailed")
+        finally:
+            os.environ.clear()
+            os.environ.update(old_env)
+            cli_main._SESSION_PROFILE = None
+            profile_layers._PROFILE_CACHE = None
+
     def test_mall_query_with_explicit_city_keeps_run_route(self) -> None:
         parser = cli_main.build_parser()
         args = parser.parse_args(
@@ -163,6 +206,89 @@ class TestChatMode(unittest.TestCase):
         self.assertIn("景德镇市", payload["cli_args"])
         notes = payload.get("tool_route_notes") or []
         self.assertTrue(any("keep native run route" in x.lower() for x in notes))
+
+    def test_chat_session_persisted_non_interactive(self) -> None:
+        old_env = dict(os.environ)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                os.environ["GEOCLAW_OPENAI_HOME"] = os.path.join(tmp, "home")
+                ensure_profile_layers()
+                cli_main._SESSION_PROFILE = None
+
+                args = argparse.Namespace(
+                    message=["第一轮问题"],
+                    message_opt="",
+                    with_ai=False,
+                    no_ai=True,
+                    execute=False,
+                    use_sre=False,
+                    sre_report_out="",
+                    interactive=False,
+                    session_id="demo_session",
+                    new_session=True,
+                    max_history_turns=8,
+                )
+                buf_a = io.StringIO()
+                with redirect_stdout(buf_a):
+                    rc_a = cli_main.cmd_chat(args)
+                self.assertEqual(rc_a, 0)
+                payload_a = json.loads(buf_a.getvalue())
+                self.assertIn("session", payload_a)
+                self.assertEqual(payload_a["session"]["session_id"], "demo_session")
+                self.assertEqual(payload_a["session"]["turns"], 1)
+
+                args.message = ["第二轮问题"]
+                args.new_session = False
+                buf_b = io.StringIO()
+                with redirect_stdout(buf_b):
+                    rc_b = cli_main.cmd_chat(args)
+                self.assertEqual(rc_b, 0)
+                payload_b = json.loads(buf_b.getvalue())
+                self.assertEqual(payload_b["session"]["session_id"], "demo_session")
+                self.assertEqual(payload_b["session"]["turns"], 2)
+
+                session_path = Path(payload_b["session"]["path"])
+                self.assertTrue(session_path.exists())
+                stored = json.loads(session_path.read_text(encoding="utf-8"))
+                self.assertEqual(len(stored.get("turns", [])), 2)
+        finally:
+            os.environ.clear()
+            os.environ.update(old_env)
+            cli_main._SESSION_PROFILE = None
+
+    def test_chat_interactive_mode_with_initial_message(self) -> None:
+        old_env = dict(os.environ)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                os.environ["GEOCLAW_OPENAI_HOME"] = os.path.join(tmp, "home")
+                ensure_profile_layers()
+                cli_main._SESSION_PROFILE = None
+
+                args = argparse.Namespace(
+                    message=["你好"],
+                    message_opt="",
+                    with_ai=False,
+                    no_ai=True,
+                    execute=False,
+                    use_sre=False,
+                    sre_report_out="",
+                    interactive=True,
+                    session_id="interactive_demo",
+                    new_session=True,
+                    max_history_turns=8,
+                )
+                buf = io.StringIO()
+                with patch("builtins.input", side_effect=["退出"]), redirect_stdout(buf):
+                    rc = cli_main.cmd_chat(args)
+                self.assertEqual(rc, 0)
+                raw = buf.getvalue()
+                self.assertIn("GeoClaw>", raw)
+                self.assertIn('"interactive": true', raw)
+                self.assertIn('"session_id": "interactive_demo"', raw)
+        finally:
+            os.environ.clear()
+            os.environ.update(old_env)
+            cli_main._SESSION_PROFILE = None
 
 
 if __name__ == "__main__":

@@ -1,6 +1,6 @@
 # GeoClaw-OpenAI Release Notes
 
-## v3.1.3 (2026-03-10)
+## v3.2.0 (2026-03-10)
 
 主要迭代：
 
@@ -19,7 +19,13 @@
 3. 文档与示例同步
    - 新增 OpenClaw 示例：`configs/examples/openclaw_skill_example.yaml`
    - README、Skill 快速上手、Skill 规范文档补充导入示例。
-   - 包版本与运行时版本升级为 `3.1.3`。
+   - 包版本与运行时版本升级为 `3.2.0`。
+
+4. Chat 连续会话与热加载
+   - 新增 `chat --interactive --session-id <id>`，支持连续多轮聊天与会话持久化。
+   - 单轮 `chat` 支持 `--session-id` 复用历史上下文。
+   - Chat 消息命中 profile 意图时可直接更新 `user.md/soul.md`，并在当前会话热加载生效。
+   - Chat 同时支持闲聊与触发工作流（`--execute`）。
 
 ## v3.1.2 (2026-03-09)
 

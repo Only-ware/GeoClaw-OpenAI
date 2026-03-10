@@ -9,6 +9,7 @@ import shlex
 import subprocess
 import sys
 import time
+import uuid
 from pathlib import Path
 
 from geoclaw_qgis.ai import ExternalAIClient, ExternalAIConfig
@@ -80,6 +81,7 @@ _SRE_SPATIAL_INTENTS = {"run", "operator", "network", "skill"}
 _RUN_SOURCE_FLAGS = ("--data-dir", "--bbox", "--city")
 _RUN_BOOL_FLAGS = ("--with-maps", "--no-maps", "--skip-download", "--force-download")
 _RUN_VALUE_FLAGS = ("--top-n", "--timeout", "--tag", "--raw-dir", "--out-root")
+_CHAT_EXIT_WORDS = {"exit", "quit", "q", "/exit", "/quit", "退出", "结束", "再见"}
 
 
 def _has_flag_value(cmd: list[str], flag: str) -> bool:
@@ -639,10 +641,252 @@ def _fallback_chat_reply(message: str, session: SessionProfile) -> str:
     return f"系统使命：{mission or '可靠、可复现的地理分析'}。我理解你的问题，会先给出可落地的下一步建议。"
 
 
-def _chat_response_payload(*, message: str, session: SessionProfile, prefer_ai: bool = True) -> dict[str, object]:
+def _utc_iso_now() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def _chat_sessions_dir() -> Path:
+    path = geoclaw_home() / "chat" / "sessions"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _normalize_chat_session_id(raw: str) -> str:
+    text = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(raw or "").strip())
+    text = text.strip("._-")
+    return text
+
+
+def _new_chat_session_id() -> str:
+    stamp = dt.datetime.now(dt.timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+    return f"chat_{stamp}_{uuid.uuid4().hex[:6]}"
+
+
+def _chat_session_path(session_id: str) -> Path:
+    return _chat_sessions_dir() / f"{session_id}.json"
+
+
+def _load_chat_session(session_id: str) -> tuple[dict[str, object], Path]:
+    sid = _normalize_chat_session_id(session_id)
+    if not sid:
+        raise ValueError("invalid chat session_id")
+    path = _chat_session_path(sid)
+    now = _utc_iso_now()
+    if not path.exists():
+        payload: dict[str, object] = {
+            "session_id": sid,
+            "created_at": now,
+            "updated_at": now,
+            "turns": [],
+        }
+        return payload, path
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:
+        payload = {}
+    if not isinstance(payload, dict):
+        payload = {}
+    turns = payload.get("turns")
+    if not isinstance(turns, list):
+        turns = []
+    payload["session_id"] = str(payload.get("session_id", sid) or sid)
+    payload["created_at"] = str(payload.get("created_at", now) or now)
+    payload["updated_at"] = str(payload.get("updated_at", now) or now)
+    payload["turns"] = [x for x in turns if isinstance(x, dict)]
+    return payload, path
+
+
+def _save_chat_session(payload: dict[str, object], path: Path) -> None:
+    data = dict(payload)
+    data["updated_at"] = _utc_iso_now()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+
+
+def _chat_history_text(
+    turns: list[dict[str, object]],
+    *,
+    max_turns: int = 8,
+    max_chars: int = 6000,
+) -> str:
+    tail = list(turns)[-max(1, int(max_turns)) :]
+    lines: list[str] = []
+    for item in tail:
+        user_text = str(item.get("user", "")).strip()
+        assistant_text = str(item.get("assistant", "")).strip()
+        if user_text:
+            lines.append(f"User: {user_text}")
+        if assistant_text:
+            lines.append(f"Assistant: {assistant_text}")
+    text = "\n".join(lines)
+    if len(text) > max_chars:
+        text = text[-max_chars:]
+    return text
+
+
+def _append_chat_turn(
+    payload: dict[str, object],
+    *,
+    message: str,
+    chat: dict[str, object],
+) -> dict[str, object]:
+    turns_raw = payload.get("turns")
+    turns: list[dict[str, object]]
+    if isinstance(turns_raw, list):
+        turns = [x for x in turns_raw if isinstance(x, dict)]
+    else:
+        turns = []
+    turns.append(
+        {
+            "ts": _utc_iso_now(),
+            "user": str(message or "").strip(),
+            "assistant": str(chat.get("reply", "")).strip(),
+            "mode": str(chat.get("mode", "")).strip(),
+        }
+    )
+    payload["turns"] = turns
+    payload["updated_at"] = _utc_iso_now()
+    return payload
+
+
+def _parse_profile_evolve_cli_args(cli_args: list[str]) -> dict[str, object]:
+    args = [str(x).strip() for x in cli_args if str(x).strip()]
+    if len(args) < 2 or args[0] != "profile" or args[1] != "evolve":
+        raise ValueError("invalid profile evolve cli args")
+
+    target = "user"
+    summary = ""
+    set_items: list[str] = []
+    add_items: list[str] = []
+    allow_soul = False
+    dry_run = False
+    i = 2
+    while i < len(args):
+        token = args[i]
+        if token == "--target" and i + 1 < len(args):
+            target = args[i + 1].strip() or target
+            i += 2
+            continue
+        if token == "--summary" and i + 1 < len(args):
+            summary = args[i + 1].strip()
+            i += 2
+            continue
+        if token == "--set" and i + 1 < len(args):
+            set_items.append(args[i + 1].strip())
+            i += 2
+            continue
+        if token == "--add" and i + 1 < len(args):
+            add_items.append(args[i + 1].strip())
+            i += 2
+            continue
+        if token == "--allow-soul":
+            allow_soul = True
+            i += 1
+            continue
+        if token == "--dry-run":
+            dry_run = True
+            i += 1
+            continue
+        i += 1
+
+    return {
+        "target": target,
+        "summary": summary,
+        "set_items": set_items,
+        "add_items": add_items,
+        "allow_soul": allow_soul,
+        "dry_run": dry_run,
+    }
+
+
+def _apply_profile_update_via_chat(*, plan: NLPlan) -> dict[str, object]:
+    parsed = _parse_profile_evolve_cli_args(plan.cli_args)
+    target = str(parsed.get("target", "user")).strip().lower()
+    if target not in {"user", "soul", "both"}:
+        target = "user"
+
+    targets = ["user", "soul"] if target == "both" else [target]
+    allow_soul = bool(parsed.get("allow_soul", False))
+    if "soul" in targets and not allow_soul:
+        # keep behavior safe/explicit: if soul is requested but not allowed by parser, skip soul.
+        targets = [t for t in targets if t != "soul"]
+
+    set_values = _parse_set_pairs(list(parsed.get("set_items", []) or []))
+    add_values = _parse_add_pairs(list(parsed.get("add_items", []) or []))
+    summary = str(parsed.get("summary", "") or "").strip()
+    dry_run = bool(parsed.get("dry_run", False))
+    root = resolve_workspace_root()
+
+    updates: list[dict[str, object]] = []
+    for current in targets:
+        updates.append(
+            apply_dialogue_profile_update(
+                target=current,
+                summary=summary,
+                set_values=set_values,
+                add_values=add_values,
+                workspace_root=root,
+                dry_run=dry_run,
+            )
+        )
+
+    session = get_session_profile(force_reload=True)
+    return {
+        "applied": True,
+        "target": target,
+        "updates": updates,
+        "profile": session.to_dict(),
+    }
+
+
+def _chat_execution_payload(
+    *,
+    message: str,
+    session: SessionProfile,
+    args: argparse.Namespace,
+    plan: NLPlan | None = None,
+) -> dict[str, object]:
+    plan = plan or parse_nl_query(message, session=session)
+    out: dict[str, object] = {"execution_plan": plan.to_dict()}
+    if plan.intent == "profile":
+        out["execution"] = {
+            "return_code": 0,
+            "note": "profile intent handled in chat mode; profile layers hot-reloaded",
+        }
+    elif plan.intent != "chat":
+        nl_cmd = [os.environ.get("PYTHON", "python3"), "-m", "geoclaw_qgis.cli.main", "nl", message, "--execute"]
+        if bool(getattr(args, "use_sre", False)):
+            nl_cmd.extend(["--use-sre"])
+        report_out = str(getattr(args, "sre_report_out", "") or "").strip()
+        if report_out:
+            nl_cmd.extend(["--sre-report-out", report_out])
+        proc = subprocess.run(nl_cmd, check=False, capture_output=True, text=True)
+        out["execution"] = {
+            "command": nl_cmd,
+            "return_code": int(proc.returncode),
+            "stdout": proc.stdout,
+            "stderr": proc.stderr,
+        }
+    else:
+        out["execution"] = {
+            "return_code": 0,
+            "note": "chat intent does not require workflow execution",
+        }
+    return out
+
+
+def _chat_response_payload(
+    *,
+    message: str,
+    session: SessionProfile,
+    prefer_ai: bool = True,
+    history_turns: list[dict[str, object]] | None = None,
+    max_history_turns: int = 8,
+) -> dict[str, object]:
     reply = ""
     mode = "fallback"
     ai_error = ""
+    history_text = _chat_history_text(history_turns or [], max_turns=max_history_turns)
     if prefer_ai:
         try:
             cfg = ExternalAIConfig.from_env()
@@ -652,7 +896,9 @@ def _chat_response_payload(*, message: str, session: SessionProfile, prefer_ai: 
                 "Chat naturally and keep concise. "
                 "If user request cannot be solved directly, provide actionable alternatives."
             )
+            history_block = f"[Conversation History]\n{history_text}\n\n" if history_text else ""
             user_prompt = (
+                f"{history_block}"
                 f"User message: {message}\n"
                 f"Preferred language: {session.user.preferred_language}\n"
                 f"Preferred tone: {session.user.preferred_tone}"
@@ -667,6 +913,7 @@ def _chat_response_payload(*, message: str, session: SessionProfile, prefer_ai: 
         "mode": mode,
         "reply": reply,
         "suggestions": _chat_suggestions(message, session),
+        "history_turns_used": min(len(history_turns or []), max(1, int(max_history_turns))),
     }
     if ai_error:
         payload["ai_warning"] = "AI response unavailable; fallback response is used."
@@ -679,42 +926,172 @@ def cmd_chat(args: argparse.Namespace) -> int:
     message_opt = str(getattr(args, "message_opt", "") or "").strip()
     message_pos = " ".join(getattr(args, "message", []) or []).strip()
     message = message_opt or message_pos
-    if not message:
-        raise ValueError("chat message is required")
+    interactive = bool(getattr(args, "interactive", False))
+    if not interactive and not message:
+        raise ValueError("chat message is required unless --interactive is used")
     prefer_ai = not bool(getattr(args, "no_ai", False))
     if bool(getattr(args, "with_ai", False)):
         prefer_ai = True
+    max_history_turns = max(1, int(getattr(args, "max_history_turns", 8)))
+
+    session_id_raw = str(getattr(args, "session_id", "") or "").strip()
+    use_session = interactive or bool(session_id_raw) or bool(getattr(args, "new_session", False))
+    chat_session_payload: dict[str, object] | None = None
+    chat_session_path: Path | None = None
+    if use_session:
+        if bool(getattr(args, "new_session", False)):
+            sid = _normalize_chat_session_id(session_id_raw) or _new_chat_session_id()
+            now = _utc_iso_now()
+            chat_session_payload = {
+                "session_id": sid,
+                "created_at": now,
+                "updated_at": now,
+                "turns": [],
+            }
+            chat_session_path = _chat_session_path(sid)
+        else:
+            sid = _normalize_chat_session_id(session_id_raw) or (interactive and _new_chat_session_id()) or ""
+            if sid:
+                chat_session_payload, chat_session_path = _load_chat_session(sid)
+
+    if interactive:
+        pending: list[str] = [message] if message else []
+        turn_count = 0
+        final_rc = 0
+        while True:
+            if pending:
+                current = pending.pop(0).strip()
+            else:
+                try:
+                    current = input("You> ").strip()
+                except EOFError:
+                    break
+            if not current:
+                continue
+            if current.lower() in _CHAT_EXIT_WORDS:
+                break
+
+            history_turns = []
+            if isinstance(chat_session_payload, dict):
+                turns = chat_session_payload.get("turns")
+                if isinstance(turns, list):
+                    history_turns = [x for x in turns if isinstance(x, dict)]
+
+            plan = parse_nl_query(current, session=session)
+            profile_update_payload: dict[str, object] | None = None
+            if plan.intent == "profile":
+                try:
+                    profile_update_payload = _apply_profile_update_via_chat(plan=plan)
+                    session = get_session_profile(force_reload=True)
+                except Exception as exc:
+                    profile_update_payload = {"applied": False, "error": str(exc)}
+
+            payload = {
+                "message": current,
+                "intent": plan.intent,
+                "nl_plan": plan.to_dict(),
+                "chat": _chat_response_payload(
+                    message=current,
+                    session=session,
+                    prefer_ai=prefer_ai,
+                    history_turns=history_turns,
+                    max_history_turns=max_history_turns,
+                ),
+                "profile_layers": {
+                    "soul_path": session.soul_path,
+                    "user_path": session.user_path,
+                },
+            }
+            if profile_update_payload is not None:
+                payload["profile_update"] = profile_update_payload
+            if bool(getattr(args, "execute", False)):
+                payload.update(_chat_execution_payload(message=current, session=session, args=args, plan=plan))
+
+            print(f"GeoClaw> {payload['chat']['reply']}")
+            turn_count += 1
+            execution = payload.get("execution")
+            if isinstance(execution, dict):
+                final_rc = int(execution.get("return_code", final_rc))
+
+            if isinstance(chat_session_payload, dict) and chat_session_path is not None:
+                _append_chat_turn(chat_session_payload, message=current, chat=payload["chat"])
+                _save_chat_session(chat_session_payload, chat_session_path)
+
+        summary: dict[str, object] = {
+            "interactive": True,
+            "turns": turn_count,
+            "profile_layers": {
+                "soul_path": session.soul_path,
+                "user_path": session.user_path,
+            },
+        }
+        if isinstance(chat_session_payload, dict) and chat_session_path is not None:
+            turns = chat_session_payload.get("turns")
+            summary["session"] = {
+                "session_id": str(chat_session_payload.get("session_id", "")),
+                "turns": len(turns) if isinstance(turns, list) else 0,
+                "path": str(chat_session_path),
+            }
+        print(json.dumps(summary, ensure_ascii=False, indent=2))
+        return int(final_rc)
+
+    history_turns = []
+    if isinstance(chat_session_payload, dict):
+        turns = chat_session_payload.get("turns")
+        if isinstance(turns, list):
+            history_turns = [x for x in turns if isinstance(x, dict)]
 
     payload = {
         "message": message,
-        "chat": _chat_response_payload(message=message, session=session, prefer_ai=prefer_ai),
+        "intent": "",
+        "chat": _chat_response_payload(
+            message=message,
+            session=session,
+            prefer_ai=prefer_ai,
+            history_turns=history_turns,
+            max_history_turns=max_history_turns,
+        ),
         "profile_layers": {
             "soul_path": session.soul_path,
             "user_path": session.user_path,
         },
     }
+    plan = parse_nl_query(message, session=session)
+    payload["intent"] = plan.intent
+    payload["nl_plan"] = plan.to_dict()
+    profile_update_payload: dict[str, object] | None = None
+    if plan.intent == "profile":
+        try:
+            profile_update_payload = _apply_profile_update_via_chat(plan=plan)
+            session = get_session_profile(force_reload=True)
+            payload["profile_layers"] = {
+                "soul_path": session.soul_path,
+                "user_path": session.user_path,
+            }
+            payload["chat"] = _chat_response_payload(
+                message=message,
+                session=session,
+                prefer_ai=prefer_ai,
+                history_turns=history_turns,
+                max_history_turns=max_history_turns,
+            )
+        except Exception as exc:
+            profile_update_payload = {"applied": False, "error": str(exc)}
+    if profile_update_payload is not None:
+        payload["profile_update"] = profile_update_payload
     if bool(getattr(args, "execute", False)):
-        plan = parse_nl_query(message, session=session)
-        payload["execution_plan"] = plan.to_dict()
-        if plan.intent != "chat":
-            nl_cmd = [os.environ.get("PYTHON", "python3"), "-m", "geoclaw_qgis.cli.main", "nl", message, "--execute"]
-            if bool(getattr(args, "use_sre", False)):
-                nl_cmd.extend(["--use-sre"])
-            report_out = str(getattr(args, "sre_report_out", "") or "").strip()
-            if report_out:
-                nl_cmd.extend(["--sre-report-out", report_out])
-            proc = subprocess.run(nl_cmd, check=False, capture_output=True, text=True)
-            payload["execution"] = {
-                "command": nl_cmd,
-                "return_code": int(proc.returncode),
-                "stdout": proc.stdout,
-                "stderr": proc.stderr,
-            }
-        else:
-            payload["execution"] = {
-                "return_code": 0,
-                "note": "chat intent does not require workflow execution",
-            }
+        payload.update(_chat_execution_payload(message=message, session=session, args=args, plan=plan))
+
+    if isinstance(chat_session_payload, dict) and chat_session_path is not None:
+        _append_chat_turn(chat_session_payload, message=message, chat=payload["chat"])
+        _save_chat_session(chat_session_payload, chat_session_path)
+        turns = chat_session_payload.get("turns")
+        payload["session"] = {
+            "session_id": str(chat_session_payload.get("session_id", "")),
+            "turns": len(turns) if isinstance(turns, list) else 0,
+            "path": str(chat_session_path),
+        }
+
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     execution = payload.get("execution")
     if isinstance(execution, dict):
@@ -2045,6 +2422,10 @@ def build_parser() -> argparse.ArgumentParser:
     chat.add_argument("--message", dest="message_opt", default="", help="chat message text (option form)")
     chat.add_argument("--with-ai", action="store_true", help="prefer AI response if provider is configured")
     chat.add_argument("--no-ai", action="store_true", help="force fallback response without AI call")
+    chat.add_argument("--interactive", action="store_true", help="start continuous multi-turn chat mode")
+    chat.add_argument("--session-id", default="", help="reuse one chat session id for context continuity")
+    chat.add_argument("--new-session", action="store_true", help="start a new session (optionally with --session-id)")
+    chat.add_argument("--max-history-turns", type=int, default=8, help="max recent turns used as chat context")
     chat.add_argument("--execute", action="store_true", help="execute parsed workflow when message is actionable")
     chat.add_argument("--use-sre", action="store_true", help="enable SRE when executing actionable workflow")
     chat.add_argument("--sre-report-out", default="", help="optional SRE report output path used with --execute")

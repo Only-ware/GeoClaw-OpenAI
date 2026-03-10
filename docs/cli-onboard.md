@@ -1,4 +1,4 @@
-# GeoClaw CLI 安装与 Onboard（v3.1.3）
+# GeoClaw CLI 安装与 Onboard（v3.2.0）
 
 机构声明：UrbanComp Lab @ China University of Geosciences (Wuhan)
 
@@ -31,7 +31,7 @@ source ~/.geoclaw-openai/env.sh
 - `~/.geoclaw-openai/soul.md`
 - `~/.geoclaw-openai/user.md`
 
-交互输入说明（v3.1.3）：
+交互输入说明（v3.2.0）：
 - API Key 输入为可见模式，便于核对长 key。
 - 若已配置旧 key，提示中会展示脱敏片段（仅开头+结尾），回车可保持原值。
 
@@ -145,6 +145,9 @@ geoclaw-openai nl "商场选址分析，优先可复现QGIS流程" --use-sre --s
 
 # 闲聊 / 建议模式
 geoclaw-openai chat --message "我运行失败了，下一步怎么排查？" --no-ai
+geoclaw-openai chat --interactive --session-id onboarding_demo
+geoclaw-openai chat --session-id onboarding_demo --message "继续上一次对话"
+geoclaw-openai chat --message "请根据这次对话更新user.md偏好，偏好英文并详细" --no-ai
 
 # 本地工具执行
 geoclaw-openai local --cmd "qgis_process --version" --timeout 30

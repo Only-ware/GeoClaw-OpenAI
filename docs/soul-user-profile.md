@@ -1,8 +1,8 @@
-# GeoClaw Soul/User 分层说明（v3.1.3）
+# GeoClaw Soul/User 分层说明（v3.2.0）
 
 ## 1. 设计目标
 
-GeoClaw v3.1.3 引入双层长期配置：
+GeoClaw v3.2.0 引入双层长期配置：
 
 - `soul.md`：系统级身份、推理原则、执行边界（高优先级）
 - `user.md`：用户长期画像与偏好（软个性化）

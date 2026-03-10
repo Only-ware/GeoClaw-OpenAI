@@ -19,7 +19,7 @@ PDF_OUTPUT = ROOT / "GeoClaw-OpenAI_工程说明书.pdf"
 
 TITLE = "GeoClaw-OpenAI 工程说明书"
 SUBTITLE = "UrbanComp Lab @ China University of Geosciences (Wuhan)"
-VERSION = "3.1.3"
+VERSION = "3.2.0"
 TODAY = dt.date.today().isoformat()
 
 sections: list[tuple[str, list[str]]] = [
@@ -28,7 +28,7 @@ sections: list[tuple[str, list[str]]] = [
         [
             "GeoClaw-OpenAI 面向科研、教学与工程团队，提供可复现的 GIS+AI 全流程能力。",
             "项目目标是将数据获取、空间分析、制图表达、AI 解释、Skill 扩展与任务记忆闭环统一到单一 CLI。",
-            "v3.1.3 在 SRE+NL+Skill+Memory 稳定闭环基础上，新增 OpenClaw Skill 兼容导入能力。",
+            "v3.2.0 在 SRE+NL+Skill+Memory 稳定闭环基础上，新增 OpenClaw Skill 兼容导入能力。",
         ],
     ),
     (
@@ -68,14 +68,16 @@ sections: list[tuple[str, list[str]]] = [
         ],
     ),
     (
-        "5. 3.1.3 版本新增重点",
+        "5. 3.2.0 版本新增重点",
         [
             "5.1 新增 skill-registry import-openclaw，用于导入 OpenClaw 风格 JSON/YAML skill 描述。",
             "5.2 OpenClaw 描述可自动映射为 GeoClaw pipeline/ai/builtin 三类 skill。",
             "5.3 导入流程复用安全评估与确认注册机制，high 风险默认阻断。",
             "5.4 新增 OpenClaw 适配器与对应单元测试，覆盖转换与 dry-run 注册链路。",
-            "5.5 README/Skill 快速上手/规范文档补充 OpenClaw 接入示例。",
-            "5.6 包版本与运行时版本升级到 v3.1.3。",
+            "5.5 新增连续聊天模式（chat --interactive + session-id），支持多轮上下文会话。",
+            "5.6 Chat 命中 profile 意图可直接更新 user.md/soul.md，并在当前会话热加载生效。",
+            "5.7 README/Skill 快速上手/规范文档补充 OpenClaw 接入与连续聊天示例。",
+            "5.8 包版本与运行时版本升级到 v3.2.0。",
         ],
     ),
     (
@@ -92,6 +94,7 @@ sections: list[tuple[str, list[str]]] = [
             "6.9 回归测试：python3 -m unittest discover -s src/geoclaw_qgis/tests。",
             "6.10 复杂端到端测试：bash scripts/e2e_complex_nl_suite.sh。",
             "6.11 聊天端到端样例：geoclaw-openai chat --message \"请你下载景德镇的数据，并分析最适合建设商场的前5个地址，输出报告\" --no-ai --execute。",
+            "6.12 连续聊天样例：geoclaw-openai chat --interactive --session-id demo_chat。",
         ],
     ),
     (

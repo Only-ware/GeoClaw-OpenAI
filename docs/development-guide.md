@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 开发指南（v3.1.3）
+# GeoClaw-OpenAI 开发指南（v3.2.0）
 
 本文档用于后续开发与维护，重点说明工程结构、核心机制、扩展入口与本地验证流程。
 
@@ -145,7 +145,7 @@ bash scripts/run_trackintel_network_demo.sh
 bash scripts/day_run.sh
 ```
 
-当前 day-run 覆盖矩阵（v3.1.3）：
+当前 day-run 覆盖矩阵（v3.2.0）：
 - run：`native_cases`、`wuhan_advanced`
 - skill：`location_analysis`、`site_selection`（按 API key 自动决定是否附带 AI 总结）
 - reasoning：`reasoning --reasoner-mode deterministic --report-out data/outputs/reasoning/day_run_reasoning.md`

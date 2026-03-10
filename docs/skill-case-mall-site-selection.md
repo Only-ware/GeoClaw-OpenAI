@@ -1,4 +1,4 @@
-# GeoClaw Skill 案例：商场选址分析（LLM 与 QGIS Processing 两种写法，v3.1.3）
+# GeoClaw Skill 案例：商场选址分析（LLM 与 QGIS Processing 两种写法，v3.2.0）
 
 本文给出同一个业务目标的两种 skill 实现方式：
 

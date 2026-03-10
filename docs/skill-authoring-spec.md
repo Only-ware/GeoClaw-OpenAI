@@ -1,4 +1,4 @@
-# GeoClaw Skill 编写规范（项目 v3.1.3，规范 v1.0）
+# GeoClaw Skill 编写规范（项目 v3.2.0，规范 v1.0）
 
 本文档定义 GeoClaw-OpenAI 项目中的 skill 编写要求，适用于 `configs/skills_registry.json` 中的 `pipeline`、`ai` 与 `builtin` 类型。
 

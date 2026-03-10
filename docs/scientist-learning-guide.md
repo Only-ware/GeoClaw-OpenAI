@@ -1,4 +1,4 @@
-# GeoClaw-OpenAI 科研学习手册（v3.1.3）
+# GeoClaw-OpenAI 科研学习手册（v3.2.0）
 
 适用对象：科研人员、研究生、GIS 初学者  
 项目归属：UrbanComp Lab @ China University of Geosciences (Wuhan)

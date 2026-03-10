@@ -42,7 +42,7 @@ source ~/.geoclaw-openai/env.sh
 `onboard` 会引导你配置：
 
 - AI provider（OpenAI / Qwen / Gemini / Ollama）
-- API Key（v3.1.3 起输入为可见模式，重配时提示脱敏 key 片段）
+- API Key（v3.2.0 起输入为可见模式，重配时提示脱敏 key 片段）
 - 默认模型
 - 默认 bbox
 
@@ -113,6 +113,15 @@ geoclaw-openai chat \
 
 ```bash
 geoclaw-openai chat --message "我这里失败了，下一步怎么排查？" --no-ai
+
+# 连续多轮闲聊（保持上下文）
+geoclaw-openai chat --interactive --session-id beginner_demo
+
+# 后续可继续复用会话上下文
+geoclaw-openai chat --session-id beginner_demo --message "继续刚才的话题"
+
+# 在聊天中更新 user.md 偏好并立即生效
+geoclaw-openai chat --message "请根据这次对话更新user.md偏好，偏好英文并详细" --no-ai
 ```
 
 ## 7. 教程维护约定

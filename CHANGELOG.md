@@ -4,6 +4,32 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-03-10
+
+### Added
+- Added OpenClaw-style skill import capability:
+  - `geoclaw-openai skill-registry import-openclaw`
+  - Converts OpenClaw JSON/YAML spec into GeoClaw `pipeline/ai/builtin` skill spec.
+  - Reuses existing skill safety assessment + user confirmation flow before registration.
+- Added OpenClaw sample spec:
+  - `configs/examples/openclaw_skill_example.yaml`
+- Added continuous chat mode with persisted sessions:
+  - `geoclaw-openai chat --interactive --session-id <id>`
+  - single-turn chat can reuse history with `--session-id`.
+- Added chat-driven profile evolution + hot reload:
+  - chat messages that route to `profile` intent now apply updates immediately
+  - `user.md/soul.md` changes are hot-reloaded in current chat session.
+
+### Changed
+- Bumped project/package runtime version to `3.2.0`.
+- Updated README/docs with OpenClaw import + continuous chat + chat profile hot-reload examples.
+- Updated chat flow to support both casual conversation and workflow triggering in one command path.
+
+### Tested
+- `python3 -m unittest discover -s src/geoclaw_qgis/tests` (109 tests, pass).
+- `python3 -m geoclaw_qgis.cli.main skill-registry import-openclaw --spec-file configs/examples/openclaw_skill_example.yaml --id-prefix oc_ --dry-run` (pass).
+- `python3 -m geoclaw_qgis.cli.main chat --interactive --session-id demo_chat --new-session --no-ai` (pass, session persisted).
+
 ## [3.1.3] - 2026-03-10
 
 ### Added

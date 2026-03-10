@@ -62,6 +62,25 @@ class TestCLIParser(unittest.TestCase):
         self.assertTrue(args.use_sre)
         self.assertEqual(args.sre_report_out, "data/outputs/reasoning/chat_report.md")
 
+    def test_chat_interactive_flags(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "chat",
+                "--interactive",
+                "--session-id",
+                "demo_session",
+                "--new-session",
+                "--max-history-turns",
+                "12",
+            ]
+        )
+        self.assertEqual(args.command, "chat")
+        self.assertTrue(args.interactive)
+        self.assertEqual(args.session_id, "demo_session")
+        self.assertTrue(args.new_session)
+        self.assertEqual(args.max_history_turns, 12)
+
     def test_local_command_exists(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["local", "--cmd", "ls -la", "--timeout", "10"])
