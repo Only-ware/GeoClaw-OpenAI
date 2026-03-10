@@ -98,6 +98,21 @@ geoclaw-openai nl "按bbox 30.50,114.20,30.66,114.45 跑区位分析" --execute
 
 当前支持解析到：`run`、`operator`、`network`、`skill`、`memory`、`update`、`profile`、`chat`、`local`。
 
+## 6.1 连续对话模式（无代码新手推荐）
+
+```bash
+# 新建并进入连续对话
+geoclaw-openai chat --interactive --session-id lab_demo --new-session
+
+# 连续提问；输入 exit / quit / 退出 结束当前会话
+
+# 后续继续同一会话（保留上下文）
+geoclaw-openai chat --session-id lab_demo --message "继续上一次对话"
+```
+
+会话持久化路径：
+- `~/.geoclaw-openai/chat/sessions/lab_demo.json`
+
 ## 7. AI Provider 与上下文压缩
 
 支持 provider：

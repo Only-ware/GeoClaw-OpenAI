@@ -124,6 +124,21 @@ geoclaw-openai chat --session-id beginner_demo --message "继续刚才的话题"
 geoclaw-openai chat --message "请根据这次对话更新user.md偏好，偏好英文并详细" --no-ai
 ```
 
+连续对话模式（一步一步）：
+
+```bash
+# 1) 新建并进入连续对话
+geoclaw-openai chat --interactive --session-id beginner_demo --new-session
+
+# 2) 连续提问；输入 exit / quit / 退出 结束本轮
+
+# 3) 后续继续同一会话
+geoclaw-openai chat --session-id beginner_demo --message "继续上次内容，给我下一步"
+```
+
+会话文件默认保存在：
+- `~/.geoclaw-openai/chat/sessions/beginner_demo.json`
+
 ## 7. 教程维护约定
 
 该文档为长期维护文档。以下变更必须同步更新本教程：

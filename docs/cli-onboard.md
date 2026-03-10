@@ -149,6 +149,12 @@ geoclaw-openai chat --interactive --session-id onboarding_demo
 geoclaw-openai chat --session-id onboarding_demo --message "继续上一次对话"
 geoclaw-openai chat --message "请根据这次对话更新user.md偏好，偏好英文并详细" --no-ai
 
+# 连续对话（新建/退出/恢复）
+geoclaw-openai chat --interactive --session-id onboarding_demo --new-session
+# 退出关键词：exit / quit / 退出
+geoclaw-openai chat --session-id onboarding_demo --message "继续上一次对话"
+# 会话文件：~/.geoclaw-openai/chat/sessions/onboarding_demo.json
+
 # 本地工具执行
 geoclaw-openai local --cmd "qgis_process --version" --timeout 30
 

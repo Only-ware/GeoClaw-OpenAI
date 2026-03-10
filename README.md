@@ -480,6 +480,21 @@ geoclaw-openai chat --message "请根据这次对话更新user.md偏好，偏好
 geoclaw-openai chat --message "请用武汉市做商场选址前5个并输出报告" --execute --use-sre
 ```
 
+连续对话模式（推荐新手先用）：
+
+```bash
+# 1) 进入连续对话（创建新会话）
+geoclaw-openai chat --interactive --session-id my_first_chat --new-session
+
+# 2) 在终端里持续输入问题；输入 exit / quit / 退出 可结束会话
+
+# 3) 之后可继续同一会话（保留上下文）
+geoclaw-openai chat --session-id my_first_chat --message "继续上一次对话"
+```
+
+会话持久化路径：
+- `~/.geoclaw-openai/chat/sessions/<session_id>.json`
+
 本地工具调用：
 
 ```bash
