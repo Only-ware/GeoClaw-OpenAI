@@ -124,7 +124,6 @@ class ExternalAIClient:
                 {"role": "system", "content": system_ctx.text},
                 {"role": "user", "content": user_ctx.text},
             ],
-            "temperature": 0.2,
         }
 
         req = urllib.request.Request(
