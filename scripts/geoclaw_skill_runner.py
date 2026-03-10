@@ -202,9 +202,19 @@ def run_ai_skill(skill_id: str, registry: SkillRegistry, ai_text: str, require_a
         }
 
 
-def summarize_with_ai(skill_id: str, registry: SkillRegistry, extra_prompt: str, require_ai: bool) -> dict[str, Any]:
+def summarize_with_ai(
+    skill_id: str,
+    registry: SkillRegistry,
+    extra_prompt: str,
+    require_ai: bool,
+    *,
+    report_path: str = "",
+) -> dict[str, Any]:
     spec = registry.get(skill_id)
-    report_text = read_text(str(ROOT / spec.report_path)) if spec.report_path else ""
+    chosen_report = report_path.strip() or spec.report_path
+    if chosen_report and not os.path.isabs(chosen_report):
+        chosen_report = str(ROOT / chosen_report)
+    report_text = read_text(chosen_report) if chosen_report else ""
     compressed_report = compress_context(report_text, max_chars=12000)
     prompt = (
         "请基于以下 GeoClaw pipeline 报告，输出空间分析结论、风险、建议行动。\n"
@@ -217,11 +227,11 @@ def summarize_with_ai(skill_id: str, registry: SkillRegistry, extra_prompt: str,
     try:
         client = ExternalAIClient(ExternalAIConfig.from_env())
         reply = client.chat(prompt, system_prompt="You are a GIS site-selection analyst.")
-        return {"summary": reply}
+        return {"summary": reply, "report_source": chosen_report}
     except Exception as exc:
         if require_ai:
             raise
-        return {"summary": "", "warning": f"AI summary skipped: {exc}"}
+        return {"summary": "", "warning": f"AI summary skipped: {exc}", "report_source": chosen_report}
 
 
 def main() -> int:
@@ -266,7 +276,14 @@ def main() -> int:
 
     if args.with_ai and spec.skill_type == "pipeline":
         extra = args.ai_input or read_text(args.ai_input_file)
-        result["ai"] = summarize_with_ai(args.skill, registry, extra, args.require_ai)
+        report_path = str(result.get("report", "")).strip()
+        result["ai"] = summarize_with_ai(
+            args.skill,
+            registry,
+            extra,
+            args.require_ai,
+            report_path=report_path,
+        )
 
     result["tool_router_context"] = session.tool_router_context()
     result["profile_layers"] = {"soul_path": session.soul_path, "user_path": session.user_path}

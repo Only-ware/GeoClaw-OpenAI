@@ -35,6 +35,21 @@ CHAT_KEYWORDS = (
     "闲聊",
     "聊天",
 )
+CHAT_REQUEST_HINTS = (
+    "你是谁",
+    "介绍你自己",
+    "介绍一下你自己",
+    "一句话介绍你自己",
+    "陪我聊",
+    "聊两句",
+    "随便聊",
+    "介绍下你自己",
+    "who are you",
+    "introduce yourself",
+    "what can you do",
+    "summarize what i asked",
+    "summarize my previous",
+)
 SPATIAL_HINTS = (
     "run",
     "skill",
@@ -82,7 +97,22 @@ class NLPlan:
 
 
 def _contains_any(text: str, terms: tuple[str, ...]) -> bool:
-    return any(t in text for t in terms)
+    def _contains_term(haystack: str, needle: str) -> bool:
+        token = needle.strip().lower()
+        if not token:
+            return False
+        # CJK terms are matched by direct substring to avoid regex tokenization issues.
+        if re.search(r"[\u4e00-\u9fff]", token):
+            return token in haystack
+        # For plain ASCII keywords, prefer token-aware matching to avoid false positives
+        # like "od" in "introduce".
+        if re.fullmatch(r"[a-z0-9]+", token):
+            pattern = rf"(?<![a-z0-9]){re.escape(token)}(?![a-z0-9])"
+            return re.search(pattern, haystack) is not None
+        return token in haystack
+
+    normalized = (text or "").lower()
+    return any(_contains_term(normalized, t) for t in terms)
 
 
 def _append_profile_reasons(reasons: list[str], session: SessionProfile | None) -> None:
@@ -123,6 +153,28 @@ def _detect_data_dir(text: str) -> str:
 
 
 def _detect_city(text: str, text_lower: str) -> str:
+    non_city_phrases = {
+        "previous turn",
+        "last turn",
+        "one sentence",
+        "this sentence",
+        "that sentence",
+        "my previous question",
+        "your previous question",
+    }
+    non_city_tokens = {
+        "previous",
+        "last",
+        "next",
+        "one",
+        "sentence",
+        "turn",
+        "question",
+        "message",
+        "summary",
+        "summarize",
+    }
+
     def _normalize_city_name(raw_city: str) -> str:
         city = raw_city.strip()
         city = re.sub(r"^(请你|请|帮我|帮忙)\s*", "", city)
@@ -165,7 +217,14 @@ def _detect_city(text: str, text_lower: str) -> str:
     if m4:
         city = _normalize_city_name(m4.group(1))
         if city:
-            return re.sub(r"\s+", " ", city)
+            city_norm = re.sub(r"\s+", " ", city).strip()
+            city_norm_lower = city_norm.lower()
+            if city_norm_lower in non_city_phrases:
+                return ""
+            token_list = re.findall(r"[a-z]+", city_norm_lower)
+            if token_list and any(tok in non_city_tokens for tok in token_list):
+                return ""
+            return city_norm
     return ""
 
 
@@ -246,6 +305,15 @@ def _build_chat_plan(
         reasons=reasons,
         cli_args=["chat", "--message", text],
     )
+
+
+def _is_conversational_chat_request(text: str, text_lower: str) -> bool:
+    if _contains_any(text_lower, CHAT_REQUEST_HINTS):
+        return True
+    # Common "introduce yourself in one sentence" style requests.
+    if _contains_any(text, ("介绍", "总结")) and _contains_any(text, ("你", "你自己")):
+        return True
+    return False
 
 
 def _build_profile_plan(query: str, text: str, text_lower: str, session: SessionProfile | None = None) -> NLPlan:
@@ -483,10 +551,12 @@ def parse_nl_query(query: str, session: SessionProfile | None = None) -> NLPlan:
         text_lower, ("更新", "修改", "同步", "写入", "evolve", "update", "adjust", "调整")
     ):
         return _build_profile_plan(text, text, text_lower, session)
-    if _contains_any(text_lower, ("update", "升级", "更新", "拉取最新", "最新版本")):
+    if _contains_any(text_lower, ("update", "updates", "升级", "更新", "拉取最新", "最新版本")):
         return _build_update_plan(text, text_lower, session)
     if _contains_any(text_lower, ("memory", "记忆", "复盘", "短期", "长期", "任务记录")):
         return _build_memory_plan(text, text, text_lower, session)
+    if _is_conversational_chat_request(text, text_lower):
+        return _build_chat_plan(text, text, session)
     if _contains_any(text_lower, ("skill", "技能")):
         return _build_skill_plan(text, text, text_lower, session)
     if _contains_any(text_lower, ("复杂网络", "network", "od", "trackintel", "流动网络")):

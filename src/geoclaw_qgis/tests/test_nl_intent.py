@@ -11,6 +11,11 @@ class TestNLIntent(unittest.TestCase):
         self.assertEqual(plan.intent, "update")
         self.assertEqual(plan.cli_args, ["update", "--check-only"])
 
+    def test_update_intent_for_english_plural_updates(self) -> None:
+        plan = parse_nl_query("check for updates")
+        self.assertEqual(plan.intent, "update")
+        self.assertEqual(plan.cli_args, ["update", "--check-only"])
+
     def test_memory_long_intent(self) -> None:
         plan = parse_nl_query("查看长期memory")
         self.assertEqual(plan.intent, "memory")
@@ -92,6 +97,21 @@ class TestNLIntent(unittest.TestCase):
         self.assertIn("site_selection", plan.cli_args)
         self.assertNotIn("武汉市", plan.cli_args)
         self.assertNotIn("--city", plan.cli_args)
+
+    def test_chat_query_not_misrouted_to_network_by_substring(self) -> None:
+        plan = parse_nl_query("Hi GeoClaw, can you briefly introduce yourself?")
+        self.assertEqual(plan.intent, "chat")
+        self.assertEqual(plan.cli_args[0], "chat")
+
+    def test_summarize_previous_turn_not_treated_as_city(self) -> None:
+        plan = parse_nl_query("Can you summarize what I asked in previous turn?")
+        self.assertEqual(plan.intent, "chat")
+        self.assertEqual(plan.cli_args[0], "chat")
+
+    def test_intro_with_spatial_terms_stays_chat(self) -> None:
+        plan = parse_nl_query("请记住GeoClaw-OpenAI是GIS/GeoAI空间分析智能体，不是Clawpack海啸GeoClaw，并一句话介绍你自己。")
+        self.assertEqual(plan.intent, "chat")
+        self.assertEqual(plan.cli_args[0], "chat")
 
 
 if __name__ == "__main__":
