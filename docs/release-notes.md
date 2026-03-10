@@ -1,5 +1,37 @@
 # GeoClaw-OpenAI Release Notes
 
+## v3.2.1 (2026-03-10)
+
+主要迭代：
+
+1. 固定身份定义防答偏
+   - 新增 `src/geoclaw_qgis/identity.py`，统一定义：
+     - GeoClaw-OpenAI 是什么
+     - 谁开发
+     - 主要功能
+     - 参考文件
+   - Chat 系统提示与 fallback 统一引用该定义，避免误答为 Clawpack 海啸 GeoClaw。
+
+2. 自然语言路由修复
+   - 修复 `od` 子串误命中导致的 `network` 误路由。
+   - 修复英文伪城市短语（如 `previous turn`、`one sentence`）被识别为城市。
+   - 修复 `check for updates`（复数）未命中 update 意图。
+   - 增强对“介绍你自己/总结上一轮”类请求的 chat 优先路由。
+
+3. Skill/对话回归与可读文档
+   - 修复 `skill --with-ai` 在 `--set out_dir=...` 时 AI 总结读取旧 report 路径的问题。
+   - 新增 10/15/20 轮对话回归脚本：
+     - `scripts/run_dialogue_10_rounds.sh`
+     - `scripts/run_dialogue_15_rounds.sh`
+     - `scripts/run_dialogue_20_rounds.sh`
+   - 新增对话易读报告与示例索引：
+     - `examples/chat/dialogue_suite_10_rounds_easy_read_20260310.md`
+     - `examples/chat/dialogue_suite_20_rounds_easy_read_20260310.md`
+
+4. 版本与文档同步
+   - 包版本与运行时版本升级为 `3.2.1`。
+   - README 更新“对话报告参考路径”和回归命令。
+
 ## v3.2.0 (2026-03-10)
 
 主要迭代：

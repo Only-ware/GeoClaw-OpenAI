@@ -4,6 +4,42 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-03-10
+
+### Added
+- Added fixed GeoClaw identity definition module:
+  - `src/geoclaw_qgis/identity.py`
+  - defines what GeoClaw-OpenAI is, who developed it, core capabilities, and reference files.
+- Added chat fallback identity answer guardrail for identity questions.
+- Added dialogue regression suites:
+  - `scripts/run_dialogue_10_rounds.sh`
+  - `scripts/run_dialogue_15_rounds.sh`
+  - `scripts/run_dialogue_20_rounds.sh`
+- Added readable dialogue reports:
+  - `examples/chat/dialogue_suite_10_rounds_easy_read_20260310.md`
+  - `examples/chat/dialogue_suite_15_rounds_20260310.md`
+  - `examples/chat/dialogue_suite_20_rounds_easy_read_20260310.md`
+
+### Changed
+- Bumped project/package runtime version to `3.2.1`.
+- Updated chat AI system prompt to include fixed identity block and explicit non-Clawpack disambiguation.
+- Updated README with dialogue-report references and regression-suite commands.
+
+### Fixed
+- Fixed NL routing false positives:
+  - avoid substring collision (`od` in words like `introduce`) incorrectly routing to `network`.
+  - avoid English pseudo-city extraction from phrases like `previous turn` / `one sentence`.
+  - support `check for updates` plural form routing to `update`.
+  - prioritize conversational self-introduction/summarization requests to `chat`.
+- Fixed skill AI summary report source when pipeline `out_dir` is overridden via `--set out_dir=...`.
+
+### Tested
+- `python3 -m unittest discover -s src/geoclaw_qgis/tests` (115 tests, pass).
+- Dialogue suite regression:
+  - `bash scripts/run_dialogue_10_rounds.sh` (PASS=10, FAIL=0)
+  - `bash scripts/run_dialogue_15_rounds.sh` (PASS=15, FAIL=0)
+  - `bash scripts/run_dialogue_20_rounds.sh` (PASS=20, FAIL=0)
+
 ## [3.2.0] - 2026-03-10
 
 ### Added

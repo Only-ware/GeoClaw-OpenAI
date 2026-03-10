@@ -26,6 +26,7 @@ from geoclaw_qgis.config import (
     write_env,
     write_env_sh,
 )
+from geoclaw_qgis.identity import GEOCLAW_IDENTITY, is_identity_question
 from geoclaw_qgis.memory import TaskMemoryStore
 from geoclaw_qgis.nl import NLPlan, parse_nl_query
 from geoclaw_qgis.profile import (
@@ -610,6 +611,10 @@ def _fallback_chat_reply(message: str, session: SessionProfile) -> str:
         if english:
             return "Tell me your goal and I can help plan an executable GeoClaw workflow."
         return "请告诉我你的目标，我可以协助你规划 GeoClaw 工作流。"
+    if is_identity_question(text):
+        if english:
+            return GEOCLAW_IDENTITY.answer_en()
+        return GEOCLAW_IDENTITY.answer_zh()
     if any(k in text.lower() for k in ("报错", "error", "失败", "无法", "can't", "cannot")):
         if english:
             return (
@@ -892,9 +897,8 @@ def _chat_response_payload(
             cfg = ExternalAIConfig.from_env()
             client = ExternalAIClient(cfg)
             system_prompt = (
-                "You are GeoClaw-OpenAI chat assistant, a GIS/GeoAI spatial analysis agent. "
-                "Important: This GeoClaw means the GeoClaw-OpenAI project assistant, "
-                "not the Clawpack tsunami/flood simulation package named GeoClaw. "
+                "You are GeoClaw chat assistant. "
+                f"{GEOCLAW_IDENTITY.prompt_block()} "
                 "Chat naturally and keep concise. "
                 "If user request cannot be solved directly, provide actionable alternatives."
             )

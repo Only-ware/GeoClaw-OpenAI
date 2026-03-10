@@ -47,6 +47,90 @@ class TestChatMode(unittest.TestCase):
             os.environ.update(old_env)
             cli_main._SESSION_PROFILE = None
 
+    def test_chat_fallback_identity_answer_is_stable(self) -> None:
+        old_env = dict(os.environ)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                os.environ["GEOCLAW_OPENAI_HOME"] = os.path.join(tmp, "home")
+                ensure_profile_layers()
+                cli_main._SESSION_PROFILE = None
+
+                args = argparse.Namespace(
+                    message=["GeoClaw是什么？谁开发的？主要功能和参考文件有哪些？"],
+                    message_opt="",
+                    with_ai=False,
+                    no_ai=True,
+                    execute=False,
+                    use_sre=False,
+                    sre_report_out="",
+                    interactive=False,
+                    session_id="",
+                    new_session=False,
+                    max_history_turns=8,
+                )
+                buf = io.StringIO()
+                with redirect_stdout(buf):
+                    rc = cli_main.cmd_chat(args)
+                self.assertEqual(rc, 0)
+                payload = json.loads(buf.getvalue())
+                reply = str(payload["chat"]["reply"])
+                self.assertIn("GeoClaw-OpenAI", reply)
+                self.assertIn("UrbanComp Lab @ China University of Geosciences (Wuhan)", reply)
+                self.assertIn("QGIS", reply)
+                self.assertIn("README.md", reply)
+        finally:
+            os.environ.clear()
+            os.environ.update(old_env)
+            cli_main._SESSION_PROFILE = None
+
+    def test_chat_ai_system_prompt_contains_identity_guardrail(self) -> None:
+        old_env = dict(os.environ)
+        captured: dict[str, str] = {}
+
+        class FakeClient:
+            def __init__(self, cfg: object) -> None:
+                self.cfg = cfg
+
+            def chat(self, user_prompt: str, system_prompt: str = "") -> str:
+                captured["system_prompt"] = system_prompt
+                return "ok"
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                os.environ["GEOCLAW_OPENAI_HOME"] = os.path.join(tmp, "home")
+                ensure_profile_layers()
+                cli_main._SESSION_PROFILE = None
+                args = argparse.Namespace(
+                    message=["hello"],
+                    message_opt="",
+                    with_ai=True,
+                    no_ai=False,
+                    execute=False,
+                    use_sre=False,
+                    sre_report_out="",
+                    interactive=False,
+                    session_id="",
+                    new_session=False,
+                    max_history_turns=8,
+                )
+                buf = io.StringIO()
+                with patch.object(cli_main.ExternalAIConfig, "from_env", return_value=object()), patch.object(
+                    cli_main, "ExternalAIClient", FakeClient
+                ), redirect_stdout(buf):
+                    rc = cli_main.cmd_chat(args)
+                self.assertEqual(rc, 0)
+                payload = json.loads(buf.getvalue())
+                self.assertEqual(payload["chat"]["mode"], "ai")
+                prompt = captured.get("system_prompt", "")
+                self.assertIn("Project name: GeoClaw-OpenAI", prompt)
+                self.assertIn("Developer: UrbanComp Lab @ China University of Geosciences (Wuhan)", prompt)
+                self.assertIn("NOT the Clawpack tsunami/flood simulation package", prompt)
+                self.assertIn("Reference files:", prompt)
+        finally:
+            os.environ.clear()
+            os.environ.update(old_env)
+            cli_main._SESSION_PROFILE = None
+
     def test_local_command_execution(self) -> None:
         args = argparse.Namespace(cmd="echo geoclaw_local_ok", cwd="", timeout=10, shell=True)
         buf = io.StringIO()
