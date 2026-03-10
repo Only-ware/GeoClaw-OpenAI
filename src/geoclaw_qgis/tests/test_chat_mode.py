@@ -11,6 +11,7 @@ from contextlib import redirect_stdout
 from pathlib import Path
 from unittest.mock import patch
 
+from geoclaw_qgis.memory import TaskMemoryStore
 from geoclaw_qgis.profile import ensure_profile_layers
 import geoclaw_qgis.profile.layers as profile_layers
 
@@ -19,6 +20,16 @@ cli_main = importlib.import_module("geoclaw_qgis.cli.main")
 
 
 class TestChatMode(unittest.TestCase):
+    def setUp(self) -> None:
+        self._old_allow_no_ai = os.environ.get("GEOCLAW_ALLOW_NO_AI_CHAT")
+        os.environ["GEOCLAW_ALLOW_NO_AI_CHAT"] = "1"
+
+    def tearDown(self) -> None:
+        if self._old_allow_no_ai is None:
+            os.environ.pop("GEOCLAW_ALLOW_NO_AI_CHAT", None)
+        else:
+            os.environ["GEOCLAW_ALLOW_NO_AI_CHAT"] = self._old_allow_no_ai
+
     def test_chat_fallback_includes_suggestions(self) -> None:
         old_env = dict(os.environ)
         try:
@@ -131,6 +142,68 @@ class TestChatMode(unittest.TestCase):
             os.environ.update(old_env)
             cli_main._SESSION_PROFILE = None
 
+    def test_chat_ai_user_prompt_includes_profile_and_memory_context(self) -> None:
+        old_env = dict(os.environ)
+        captured: dict[str, str] = {}
+
+        class FakeClient:
+            def __init__(self, cfg: object) -> None:
+                self.cfg = cfg
+
+            def chat(self, user_prompt: str, system_prompt: str = "") -> str:
+                captured["system_prompt"] = system_prompt
+                captured["user_prompt"] = user_prompt
+                return "ok"
+
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                os.environ["GEOCLAW_OPENAI_HOME"] = os.path.join(tmp, "home")
+                ensure_profile_layers()
+                cli_main._SESSION_PROFILE = None
+
+                store = TaskMemoryStore()
+                task_id = store.start_task("run", ["--case", "site_selection"], cwd=tmp)
+                store.finish_task(task_id, 0, error="")
+                store.auto_review_to_long(task_id)
+                store.record_chat_turn(
+                    session_id="memory_demo",
+                    user_message="上一轮讨论武汉商场选址。",
+                    assistant_reply="建议先做可达性和覆盖分析。",
+                    intent="chat",
+                    mode="fallback",
+                )
+
+                args = argparse.Namespace(
+                    message=["继续上一次讨论，给我下一步。"],
+                    message_opt="",
+                    with_ai=True,
+                    no_ai=False,
+                    execute=False,
+                    use_sre=False,
+                    sre_report_out="",
+                    interactive=False,
+                    session_id="memory_demo",
+                    new_session=False,
+                    max_history_turns=8,
+                )
+                buf = io.StringIO()
+                with patch.object(cli_main.ExternalAIConfig, "from_env", return_value=object()), patch.object(
+                    cli_main, "ExternalAIClient", FakeClient
+                ), redirect_stdout(buf):
+                    rc = cli_main.cmd_chat(args)
+                self.assertEqual(rc, 0)
+                payload = json.loads(buf.getvalue())
+                self.assertEqual(payload["chat"]["mode"], "ai")
+
+                user_prompt = captured.get("user_prompt", "")
+                self.assertIn("[Profile Context]", user_prompt)
+                self.assertIn("[Memory Context]", user_prompt)
+                self.assertIn("Recent reviewed memories", user_prompt)
+        finally:
+            os.environ.clear()
+            os.environ.update(old_env)
+            cli_main._SESSION_PROFILE = None
+
     def test_local_command_execution(self) -> None:
         args = argparse.Namespace(cmd="echo geoclaw_local_ok", cwd="", timeout=10, shell=True)
         buf = io.StringIO()
@@ -145,6 +218,29 @@ class TestChatMode(unittest.TestCase):
         self.assertEqual(cli_main._mask_api_key(""), "")
         self.assertEqual(cli_main._mask_api_key("abc"), "a*c")
         self.assertEqual(cli_main._mask_api_key("sk-test-1234567890"), "sk-t***7890")
+
+    def test_chat_no_ai_disabled_by_default(self) -> None:
+        old_env = dict(os.environ)
+        try:
+            os.environ.pop("GEOCLAW_ALLOW_NO_AI_CHAT", None)
+            args = argparse.Namespace(
+                message=["hello"],
+                message_opt="",
+                with_ai=False,
+                no_ai=True,
+                execute=False,
+                use_sre=False,
+                sre_report_out="",
+                interactive=False,
+                session_id="",
+                new_session=False,
+                max_history_turns=8,
+            )
+            with self.assertRaises(ValueError):
+                cli_main.cmd_chat(args)
+        finally:
+            os.environ.clear()
+            os.environ.update(old_env)
 
     def test_chat_reply_changes_with_profile(self) -> None:
         old_env = dict(os.environ)
@@ -204,7 +300,7 @@ class TestChatMode(unittest.TestCase):
                 reply_b = str(payload_b["chat"]["reply"])
 
                 self.assertNotEqual(reply_a, reply_b)
-                self.assertIn("Mission B", reply_b)
+                self.assertIn("Practical next step", reply_b)
         finally:
             os.environ.clear()
             os.environ.update(old_env)
@@ -320,6 +416,8 @@ class TestChatMode(unittest.TestCase):
                 self.assertIn("session", payload_a)
                 self.assertEqual(payload_a["session"]["session_id"], "demo_session")
                 self.assertEqual(payload_a["session"]["turns"], 1)
+                self.assertIn("chat_memory", payload_a)
+                self.assertEqual(payload_a["chat_memory"]["session_id"], "demo_session")
 
                 args.message = ["第二轮问题"]
                 args.new_session = False
@@ -335,6 +433,10 @@ class TestChatMode(unittest.TestCase):
                 self.assertTrue(session_path.exists())
                 stored = json.loads(session_path.read_text(encoding="utf-8"))
                 self.assertEqual(len(stored.get("turns", [])), 2)
+
+                store = TaskMemoryStore()
+                digest = store.get_chat_daily_digest(session_id="demo_session")
+                self.assertEqual(int(digest.get("turn_count", 0)), 2)
         finally:
             os.environ.clear()
             os.environ.update(old_env)

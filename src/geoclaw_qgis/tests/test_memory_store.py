@@ -46,6 +46,40 @@ class TestMemoryStore(unittest.TestCase):
             os.environ.clear()
             os.environ.update(old_env)
 
+    def test_record_chat_turn_daily_digest(self) -> None:
+        old_env = dict(os.environ)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                os.environ["GEOCLAW_OPENAI_HOME"] = str(Path(tmp) / "home")
+                store = TaskMemoryStore()
+
+                row_a = store.record_chat_turn(
+                    session_id="daily_demo",
+                    user_message="第一轮：武汉商场选址怎么做",
+                    assistant_reply="先确认研究范围和数据。",
+                    intent="chat",
+                    mode="fallback",
+                )
+                row_b = store.record_chat_turn(
+                    session_id="daily_demo",
+                    user_message="第二轮：继续并输出前5个候选点",
+                    assistant_reply="已记录，会在 run 工作流中设置 --top-n 5。",
+                    intent="run",
+                    mode="ai",
+                )
+                self.assertEqual(row_a.get("task_id"), row_b.get("task_id"))
+
+                digest = store.get_chat_daily_digest(session_id="daily_demo")
+                self.assertEqual(int(digest.get("turn_count", 0)), 2)
+                intents = [str(x) for x in (digest.get("intents") or [])]
+                self.assertIn("chat", intents)
+                self.assertIn("run", intents)
+                turns = [x for x in (digest.get("recent_turns") or []) if isinstance(x, dict)]
+                self.assertEqual(len(turns), 2)
+        finally:
+            os.environ.clear()
+            os.environ.update(old_env)
+
 
 if __name__ == "__main__":
     unittest.main()

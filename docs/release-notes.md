@@ -1,5 +1,24 @@
 # GeoClaw-OpenAI Release Notes
 
+## v3.2.2 (2026-03-10)
+
+主要迭代：
+
+1. AI-first 默认策略统一
+   - `chat` 模式默认强制 AI 响应；普通使用不再支持 `--no-ai`。
+   - `chat --help` 隐藏 `--no-ai`，避免新手误用无 AI 回答路径。
+   - `skill` 运行器默认开启 AI 总结，可按需 `--no-ai` 临时关闭。
+
+2. 连续闲聊回归增强
+   - 新增 30 轮 AI 连续闲聊回归脚本：`scripts/run_dialogue_30_chitchat.sh`。
+   - 新增完整 Q/A 对话报告：
+     - `examples/chat/dialogue_suite_30_rounds_chitchat_20260310.md`
+     - `examples/chat/dialogue_suite_30_rounds_chitchat_full_20260310.md`
+
+3. 文档与版本同步
+   - 包版本与运行时版本升级为 `3.2.2`。
+   - README 新增 AI 默认策略说明并将示例统一为 AI 优先。
+
 ## v3.2.1 (2026-03-10)
 
 主要迭代：

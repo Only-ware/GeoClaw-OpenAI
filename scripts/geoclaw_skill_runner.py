@@ -31,7 +31,19 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--city", default="", help="city name for OSM download when required")
     parser.add_argument("--bbox", default=os.environ.get("GEOCLAW_OPENAI_DEFAULT_BBOX", ""), help="bbox for OSM download")
     parser.add_argument("--skip-download", action="store_true", help="skip OSM download")
-    parser.add_argument("--with-ai", action="store_true", help="run external AI summarization")
+    parser.add_argument(
+        "--with-ai",
+        dest="with_ai",
+        action="store_true",
+        help="enable AI summarization (default)",
+    )
+    parser.add_argument(
+        "--no-ai",
+        dest="with_ai",
+        action="store_false",
+        help="disable AI summarization for this run",
+    )
+    parser.set_defaults(with_ai=True)
     parser.add_argument("--require-ai", action="store_true", help="fail if AI call is unavailable")
     parser.add_argument("--ai-input", default="", help="extra AI prompt text")
     parser.add_argument("--ai-input-file", default="", help="load extra AI prompt text from file")

@@ -11,6 +11,7 @@ import sys
 import time
 import uuid
 from pathlib import Path
+from typing import Any
 
 from geoclaw_qgis.ai import ExternalAIClient, ExternalAIConfig
 from geoclaw_qgis.analysis import TrackintelIntegrationError, TrackintelNetworkService
@@ -600,13 +601,92 @@ def _chat_suggestions(message: str, session: SessionProfile) -> list[str]:
     return suggestions
 
 
-def _fallback_chat_reply(message: str, session: SessionProfile) -> str:
+def _contains_any(text_lower: str, keywords: tuple[str, ...]) -> bool:
+    return any(k in text_lower for k in keywords)
+
+
+def _fallback_chitchat_reply_zh(text: str, *, memory_hint: str = "") -> str:
+    tl = text.lower()
+
+    if _contains_any(tl, ("高质量对话",)):
+        return "高质量对话=目标清晰、信息真实、下一步可执行。"
+    if _contains_any(tl, ("沟通", "交流")) and _contains_any(tl, ("三个", "3")) and _contains_any(tl, ("技巧",)):
+        return "三个技巧：1) 先说结论；2) 再给依据；3) 最后明确下一步和截止时间。"
+    if _contains_any(tl, ("平衡效率和耐心", "效率和耐心")):
+        return "先用一句话确认需求，再给最多3步建议；每步都留1个确认点，既快又不冒进。"
+    if _contains_any(tl, ("状态一般", "没状态", "有点累")) and _contains_any(tl, ("推进", "前进", "一点点")):
+        return "先做15分钟最小任务：写目标一句话、列3个子任务、完成第1个子任务的第一步。"
+    if _contains_any(tl, ("焦虑",)) and _contains_any(tl, ("拆小", "拆分")):
+        return "把任务拆成三层：今天必须完成1件、可选完成2件、以后再做其余；先做“必须完成”的第一步。"
+    if _contains_any(tl, ("明确目标",)) and _contains_any(tl, ("问题", "提问")):
+        return "你最希望今天结束前“可见”的成果是什么（文档、图、表、还是一个可运行命令）？"
+    if _contains_any(tl, ("追问", "更具体的问题")):
+        return "如果只能选一个动作现在就做，它是什么，完成它需要的最小输入是什么？"
+    if _contains_any(tl, ("清单模板", "checklist")):
+        return "极简清单：1) 目标一句话；2) 三个子任务；3) 先做哪一个；4) 完成标准；5) 截止时间。"
+    if _contains_any(tl, ("安抚",)) and _contains_any(tl, ("示例", "回复")):
+        return "我知道你现在有压力，我们先只做一件最小可完成的事：把目标写成一句话，我陪你一步步推进。"
+    if _contains_any(tl, ("纠结细节", "拉回主线", "主线")):
+        return "先回到主问题：这件事的成功标准是什么？不影响标准的细节先标记到“后处理”清单。"
+    if _contains_any(tl, ("聊天风格", "总结一下")):
+        return "目前风格偏务实和结构化：你给场景，我给可执行步骤；优先明确目标，再收敛到下一步。"
+    if _contains_any(tl, ("晚间回顾", "复盘")) and _contains_any(tl, ("提问框架", "框架")):
+        return "晚间回顾框架：今天做成了什么？卡在哪里？明天第一步做什么？"
+    if _contains_any(tl, ("三问", "简化")):
+        return "三问版：1) 今天最关键成果？2) 最大阻碍？3) 明天第一步？"
+    if _contains_any(tl, ("更有温度", "语气自然", "像同事")):
+        return "可以，我会保持直给建议，同时用更自然的表达，不堆术语，也不空话。"
+    if _contains_any(tl, ("沟通句式", "句式")):
+        return "实用句式：先说结论“我建议先做A”，再说原因“因为B”，最后说动作“现在我先完成C”。"
+    if _contains_any(tl, ("很累",)) and _contains_any(tl, ("一句话回应", "一句话")):
+        return "你先休息5分钟，我们只推进一个最小步骤，做完就算今天有进展。"
+    if _contains_any(tl, ("鼓励", "务实")):
+        return "你不需要一次做完全部，只要把下一步做实，项目就已经在前进。"
+    if _contains_any(tl, ("收尾", "两句话")):
+        return "今天你已经把方向和节奏理清了，这很关键。明天从最小可执行步骤开始，我继续协助你推进。"
+
+    base = "我理解你的问题。先给你一个可执行建议：明确目标一句话，然后立刻做第一步。"
+    if memory_hint:
+        base += f" 最近复盘提醒：{memory_hint}"
+    return base
+
+
+def _fallback_chitchat_reply_en(text: str, *, memory_hint: str = "") -> str:
+    tl = text.lower()
+    if _contains_any(tl, ("high-quality conversation", "good conversation")):
+        return "A high-quality conversation is clear on goals, honest on constraints, and ends with an executable next step."
+    if _contains_any(tl, ("three", "3")) and _contains_any(tl, ("communication", "tips")):
+        return "Three tips: lead with conclusion, add evidence, and finish with one concrete next action plus deadline."
+    if _contains_any(tl, ("checklist", "template")):
+        return "Mini checklist: goal in one line, 3 subtasks, first action now, done criteria, deadline."
+    if _contains_any(tl, ("wrap up", "two sentences", "closing")):
+        return "You clarified direction and priorities today. Start tomorrow with the smallest executable action and keep momentum."
+    if _contains_any(tl, ("encourage", "practical")):
+        return "You do not need to finish everything at once; one solid next step is real progress."
+
+    base = "I understand your question. Practical next step: write your goal in one sentence, then execute the first small action now."
+    if memory_hint:
+        base += f" Recent review reminder: {memory_hint}"
+    return base
+
+
+def _fallback_chat_reply(
+    message: str,
+    session: SessionProfile,
+    *,
+    memory_context: dict[str, object] | None = None,
+) -> str:
     text = str(message or "").strip()
     lang = session.user.preferred_language.strip().lower()
     tone = session.user.preferred_tone.strip().lower()
     mission = session.soul.mission.strip()
     english = "english" in lang and "chinese" not in lang
     detailed = "detailed" in tone or "详细" in tone or "step-by-step" in tone
+    memory_hint = ""
+    if isinstance(memory_context, dict):
+        summaries = [str(x).strip() for x in (memory_context.get("recent_long_summaries") or []) if str(x).strip()]
+        if summaries:
+            memory_hint = _clip_prompt_text(summaries[0], max_chars=120)
     if not text:
         if english:
             return "Tell me your goal and I can help plan an executable GeoClaw workflow."
@@ -630,20 +710,9 @@ def _fallback_chat_reply(message: str, session: SessionProfile) -> str:
         if english:
             return "Hello. I can chat and also convert your request into executable GeoClaw commands."
         return "你好，我可以闲聊，也可以帮你把需求转成可执行的 GeoClaw 命令。"
-    if detailed:
-        if english:
-            return (
-                f"Mission: {mission or 'Reliable geospatial analysis'}. "
-                "I understand your request. I suggest three steps: clarify goal, validate data and CRS, "
-                "then run and review reproducible outputs."
-            )
-        return (
-            f"系统使命：{mission or '可靠、可复现的地理分析'}。"
-            "我理解你的问题。建议三步：1) 明确目标与约束；2) 检查数据与坐标系；3) 执行并复核可复现输出。"
-        )
     if english:
-        return f"Mission: {mission or 'Reliable geospatial analysis'}. I understand your request and will provide actionable next steps."
-    return f"系统使命：{mission or '可靠、可复现的地理分析'}。我理解你的问题，会先给出可落地的下一步建议。"
+        return _fallback_chitchat_reply_en(text, memory_hint=memory_hint)
+    return _fallback_chitchat_reply_zh(text, memory_hint=memory_hint)
 
 
 def _utc_iso_now() -> str:
@@ -752,6 +821,177 @@ def _append_chat_turn(
     payload["turns"] = turns
     payload["updated_at"] = _utc_iso_now()
     return payload
+
+
+def _safe_chat_memory_session_id(raw: str) -> str:
+    sid = _normalize_chat_session_id(raw)
+    return sid or "adhoc"
+
+
+def _clip_prompt_text(text: str, *, max_chars: int = 220) -> str:
+    value = str(text or "").strip()
+    if len(value) <= max_chars:
+        return value
+    return value[: max(1, max_chars - 3)] + "..."
+
+
+def _profile_context_block(session: SessionProfile) -> str:
+    tools = ", ".join(session.user.preferred_tools[:5]) if session.user.preferred_tools else ""
+    outputs = ", ".join(session.user.output_preferences[:5]) if session.user.output_preferences else ""
+    constraints = "; ".join(session.user.long_term_constraints[:3]) if session.user.long_term_constraints else ""
+    mission = _clip_prompt_text(session.soul.mission, max_chars=180)
+    standards = "; ".join(session.soul.output_quality_standards[:3]) if session.soul.output_quality_standards else ""
+    lines = [
+        f"User role: {session.user.role}",
+        f"Preferred language: {session.user.preferred_language}",
+        f"Preferred tone: {session.user.preferred_tone}",
+    ]
+    if tools:
+        lines.append(f"Preferred tools: {tools}")
+    if outputs:
+        lines.append(f"Output preferences: {outputs}")
+    if constraints:
+        lines.append(f"Long-term constraints: {constraints}")
+    if mission:
+        lines.append(f"Soul mission: {mission}")
+    if standards:
+        lines.append(f"Output quality standards: {standards}")
+    return "\n".join(lines)
+
+
+def _memory_hit_line(hit: dict[str, Any]) -> str:
+    source = str(hit.get("source", "")).strip() or "memory"
+    score = hit.get("score")
+    payload = hit.get("payload")
+    data = payload if isinstance(payload, dict) else {}
+    task_id = str(data.get("task_id", "")).strip()
+    command = str(data.get("command", "")).strip()
+    status = str(data.get("status", "")).strip()
+    summary = str(data.get("summary", "")).strip()
+    review = data.get("review")
+    if not summary and isinstance(review, dict):
+        summary = str(review.get("summary", "")).strip()
+    text = f"[{source}] task={task_id} command={command} status={status}"
+    if summary:
+        text += f" summary={_clip_prompt_text(summary, max_chars=160)}"
+    if isinstance(score, (float, int)):
+        text += f" score={round(float(score), 3)}"
+    return text
+
+
+def _collect_chat_memory_context(
+    *,
+    message: str,
+    session: SessionProfile,
+    session_id: str,
+) -> dict[str, object]:
+    try:
+        store = TaskMemoryStore(session_profile=session)
+        top_k_raw = str(os.environ.get("GEOCLAW_CHAT_MEMORY_TOP_K", "3")).strip() or "3"
+        min_score_raw = str(os.environ.get("GEOCLAW_CHAT_MEMORY_MIN_SCORE", "0.12")).strip() or "0.12"
+        long_limit_raw = str(os.environ.get("GEOCLAW_CHAT_LONG_LIMIT", "3")).strip() or "3"
+        top_k = max(1, int(top_k_raw))
+        min_score = max(0.0, float(min_score_raw))
+        long_limit = max(1, int(long_limit_raw))
+
+        hits_raw = store.search_memory(query=message, scope="all", top_k=max(8, top_k * 3), min_score=min_score)
+        hits: list[dict[str, object]] = []
+        for hit in hits_raw:
+            payload = hit.get("payload")
+            if not isinstance(payload, dict):
+                continue
+            command = str(payload.get("command", "")).strip().lower()
+            extra = payload.get("extra")
+            memory_kind = str((extra or {}).get("memory_kind", "")).strip().lower() if isinstance(extra, dict) else ""
+            if command in {"memory", "nl"}:
+                continue
+            if command == "chat" and memory_kind != "chat_daily":
+                continue
+            hits.append(hit)
+            if len(hits) >= top_k:
+                break
+        daily = store.get_chat_daily_digest(session_id=_safe_chat_memory_session_id(session_id))
+        recent_long = store.list_long(limit=long_limit)
+        long_summaries: list[str] = []
+        for row in recent_long[:long_limit]:
+            command = str(row.get("command", "")).strip().lower()
+            if command in {"chat", "memory", "nl", "profile"}:
+                continue
+            summary = str(row.get("summary", "")).strip()
+            if summary:
+                long_summaries.append(_clip_prompt_text(summary, max_chars=180))
+        return {
+            "daily_digest": daily,
+            "relevant_hits": hits,
+            "recent_long_summaries": long_summaries,
+        }
+    except Exception as exc:
+        return {"warning": f"memory context unavailable: {exc}"}
+
+
+def _chat_memory_context_block(memory_context: dict[str, object]) -> str:
+    lines: list[str] = []
+    daily = memory_context.get("daily_digest")
+    if isinstance(daily, dict) and daily:
+        turn_count = int(daily.get("turn_count", 0) or 0)
+        intents = [str(x) for x in (daily.get("intents") or []) if str(x).strip()]
+        modes = [str(x) for x in (daily.get("modes") or []) if str(x).strip()]
+        last_turn_at = str(daily.get("last_turn_at", "")).strip()
+        lines.append(
+            f"Daily dialogue digest: turns={turn_count}, intents={','.join(intents[:6])}, modes={','.join(modes[:6])}, last_turn_at={last_turn_at}"
+        )
+        recent_turns = [x for x in (daily.get("recent_turns") or []) if isinstance(x, dict)]
+        for item in recent_turns[-2:]:
+            user_text = _clip_prompt_text(str(item.get("user", "")), max_chars=80)
+            if user_text:
+                lines.append(f"Recent user topic: {user_text}")
+
+    summaries = [str(x).strip() for x in (memory_context.get("recent_long_summaries") or []) if str(x).strip()]
+    if summaries:
+        lines.append("Recent reviewed memories:")
+        for item in summaries[:3]:
+            lines.append(f"- {item}")
+
+    hits = [x for x in (memory_context.get("relevant_hits") or []) if isinstance(x, dict)]
+    if hits:
+        lines.append("Relevant memory retrieval:")
+        for hit in hits[:4]:
+            lines.append(f"- {_memory_hit_line(hit)}")
+    warning = str(memory_context.get("warning", "")).strip()
+    if warning:
+        lines.append(f"Memory warning: {warning}")
+    return "\n".join(lines)
+
+
+def _record_chat_turn_memory(
+    *,
+    session: SessionProfile,
+    session_id: str,
+    message: str,
+    chat_payload: dict[str, object],
+    intent: str,
+) -> dict[str, object]:
+    try:
+        store = TaskMemoryStore(session_profile=session)
+        row = store.record_chat_turn(
+            session_id=_safe_chat_memory_session_id(session_id),
+            user_message=message,
+            assistant_reply=str(chat_payload.get("reply", "")),
+            intent=intent,
+            mode=str(chat_payload.get("mode", "")),
+            event_time=_utc_iso_now(),
+            cwd=str(Path.cwd().resolve()),
+        )
+        digest = row.get("chat_digest")
+        turn_count = int(digest.get("turn_count", 0)) if isinstance(digest, dict) else 0
+        return {
+            "task_id": str(row.get("task_id", "")),
+            "turn_count": turn_count,
+            "session_id": _safe_chat_memory_session_id(session_id),
+            "date": str((row.get("extra") or {}).get("date", "")),
+        }
+    except Exception as exc:
+        return {"warning": str(exc)}
 
 
 def _parse_profile_evolve_cli_args(cli_args: list[str]) -> dict[str, object]:
@@ -884,7 +1124,9 @@ def _chat_response_payload(
     *,
     message: str,
     session: SessionProfile,
+    session_id: str = "",
     prefer_ai: bool = True,
+    require_ai: bool = False,
     history_turns: list[dict[str, object]] | None = None,
     max_history_turns: int = 8,
 ) -> dict[str, object]:
@@ -892,6 +1134,9 @@ def _chat_response_payload(
     mode = "fallback"
     ai_error = ""
     history_text = _chat_history_text(history_turns or [], max_turns=max_history_turns)
+    profile_block = _profile_context_block(session)
+    memory_context = _collect_chat_memory_context(message=message, session=session, session_id=session_id)
+    memory_block = _chat_memory_context_block(memory_context)
     if prefer_ai:
         try:
             cfg = ExternalAIConfig.from_env()
@@ -900,10 +1145,16 @@ def _chat_response_payload(
                 "You are GeoClaw chat assistant. "
                 f"{GEOCLAW_IDENTITY.prompt_block()} "
                 "Chat naturally and keep concise. "
+                "Use profile and memory context to keep continuity and human-like personalization. "
+                "Do not fabricate memory facts. "
                 "If user request cannot be solved directly, provide actionable alternatives."
             )
+            profile_prompt_block = f"[Profile Context]\n{profile_block}\n\n" if profile_block else ""
+            memory_prompt_block = f"[Memory Context]\n{memory_block}\n\n" if memory_block else ""
             history_block = f"[Conversation History]\n{history_text}\n\n" if history_text else ""
             user_prompt = (
+                f"{profile_prompt_block}"
+                f"{memory_prompt_block}"
                 f"{history_block}"
                 f"User message: {message}\n"
                 f"Preferred language: {session.user.preferred_language}\n"
@@ -913,13 +1164,26 @@ def _chat_response_payload(
             mode = "ai"
         except Exception as exc:
             ai_error = str(exc)
+            if bool(require_ai):
+                raise RuntimeError(f"chat requires AI response, but AI call failed: {ai_error}") from exc
     if not reply.strip():
-        reply = _fallback_chat_reply(message, session)
+        if bool(require_ai):
+            raise RuntimeError("chat requires AI response, but response content is empty")
+        reply = _fallback_chat_reply(message, session, memory_context=memory_context)
     payload: dict[str, object] = {
         "mode": mode,
         "reply": reply,
         "suggestions": _chat_suggestions(message, session),
         "history_turns_used": min(len(history_turns or []), max(1, int(max_history_turns))),
+        "memory_context": {
+            "relevant_hits": len([x for x in (memory_context.get("relevant_hits") or []) if isinstance(x, dict)]),
+            "recent_long_summaries": len(
+                [x for x in (memory_context.get("recent_long_summaries") or []) if str(x).strip()]
+            ),
+            "daily_turns": int((memory_context.get("daily_digest") or {}).get("turn_count", 0) or 0)
+            if isinstance(memory_context.get("daily_digest"), dict)
+            else 0,
+        },
     }
     if ai_error:
         payload["ai_warning"] = "AI response unavailable; fallback response is used."
@@ -935,9 +1199,10 @@ def cmd_chat(args: argparse.Namespace) -> int:
     interactive = bool(getattr(args, "interactive", False))
     if not interactive and not message:
         raise ValueError("chat message is required unless --interactive is used")
-    prefer_ai = not bool(getattr(args, "no_ai", False))
-    if bool(getattr(args, "with_ai", False)):
-        prefer_ai = True
+    allow_no_ai = str(os.environ.get("GEOCLAW_ALLOW_NO_AI_CHAT", "")).strip().lower() in {"1", "true", "yes"}
+    if bool(getattr(args, "no_ai", False)) and not allow_no_ai:
+        raise ValueError("chat mode requires AI. '--no-ai' is disabled.")
+    prefer_ai = True
     max_history_turns = max(1, int(getattr(args, "max_history_turns", 8)))
 
     session_id_raw = str(getattr(args, "session_id", "") or "").strip()
@@ -959,6 +1224,11 @@ def cmd_chat(args: argparse.Namespace) -> int:
             sid = _normalize_chat_session_id(session_id_raw) or (interactive and _new_chat_session_id()) or ""
             if sid:
                 chat_session_payload, chat_session_path = _load_chat_session(sid)
+    chat_memory_session_id = ""
+    if isinstance(chat_session_payload, dict):
+        chat_memory_session_id = str(chat_session_payload.get("session_id", "")).strip()
+    if not chat_memory_session_id:
+        chat_memory_session_id = _safe_chat_memory_session_id(session_id_raw)
 
     if interactive:
         pending: list[str] = [message] if message else []
@@ -999,7 +1269,9 @@ def cmd_chat(args: argparse.Namespace) -> int:
                 "chat": _chat_response_payload(
                     message=current,
                     session=session,
+                    session_id=chat_memory_session_id,
                     prefer_ai=prefer_ai,
+                    require_ai=not allow_no_ai,
                     history_turns=history_turns,
                     max_history_turns=max_history_turns,
                 ),
@@ -1012,6 +1284,13 @@ def cmd_chat(args: argparse.Namespace) -> int:
                 payload["profile_update"] = profile_update_payload
             if bool(getattr(args, "execute", False)):
                 payload.update(_chat_execution_payload(message=current, session=session, args=args, plan=plan))
+            payload["chat_memory"] = _record_chat_turn_memory(
+                session=session,
+                session_id=chat_memory_session_id,
+                message=current,
+                chat_payload=payload["chat"],
+                intent=plan.intent,
+            )
 
             print(f"GeoClaw> {payload['chat']['reply']}")
             turn_count += 1
@@ -1053,7 +1332,9 @@ def cmd_chat(args: argparse.Namespace) -> int:
         "chat": _chat_response_payload(
             message=message,
             session=session,
+            session_id=chat_memory_session_id,
             prefer_ai=prefer_ai,
+            require_ai=not allow_no_ai,
             history_turns=history_turns,
             max_history_turns=max_history_turns,
         ),
@@ -1077,7 +1358,9 @@ def cmd_chat(args: argparse.Namespace) -> int:
             payload["chat"] = _chat_response_payload(
                 message=message,
                 session=session,
+                session_id=chat_memory_session_id,
                 prefer_ai=prefer_ai,
+                require_ai=not allow_no_ai,
                 history_turns=history_turns,
                 max_history_turns=max_history_turns,
             )
@@ -1087,6 +1370,13 @@ def cmd_chat(args: argparse.Namespace) -> int:
         payload["profile_update"] = profile_update_payload
     if bool(getattr(args, "execute", False)):
         payload.update(_chat_execution_payload(message=message, session=session, args=args, plan=plan))
+    payload["chat_memory"] = _record_chat_turn_memory(
+        session=session,
+        session_id=chat_memory_session_id,
+        message=message,
+        chat_payload=payload["chat"],
+        intent=plan.intent,
+    )
 
     if isinstance(chat_session_payload, dict) and chat_session_path is not None:
         _append_chat_turn(chat_session_payload, message=message, chat=payload["chat"])
@@ -1739,7 +2029,13 @@ def cmd_nl(args: argparse.Namespace) -> int:
     session = get_session_profile()
     plan: NLPlan = parse_nl_query(query_text, session=session)
     if plan.intent == "chat":
-        chat_payload = _chat_response_payload(message=query_text, session=session, prefer_ai=True)
+        chat_payload = _chat_response_payload(
+            message=query_text,
+            session=session,
+            session_id="nl_preview",
+            prefer_ai=True,
+            require_ai=True,
+        )
         payload = {
             "query": plan.query,
             "intent": plan.intent,
@@ -2423,11 +2719,11 @@ def build_parser() -> argparse.ArgumentParser:
     local.add_argument("--shell", action="store_true", help="run command through shell")
     local.set_defaults(func=cmd_local)
 
-    chat = sub.add_parser("chat", help="chat mode with fallback suggestions")
+    chat = sub.add_parser("chat", help="chat mode (AI-first; requires configured AI provider)")
     chat.add_argument("message", nargs="*", help="chat message text")
     chat.add_argument("--message", dest="message_opt", default="", help="chat message text (option form)")
-    chat.add_argument("--with-ai", action="store_true", help="prefer AI response if provider is configured")
-    chat.add_argument("--no-ai", action="store_true", help="force fallback response without AI call")
+    chat.add_argument("--with-ai", action="store_true", help="AI response is enabled by default; this flag is optional")
+    chat.add_argument("--no-ai", action="store_true", help=argparse.SUPPRESS)
     chat.add_argument("--interactive", action="store_true", help="start continuous multi-turn chat mode")
     chat.add_argument("--session-id", default="", help="reuse one chat session id for context continuity")
     chat.add_argument("--new-session", action="store_true", help="start a new session (optionally with --session-id)")

@@ -183,11 +183,11 @@ geoclaw-openai nl "用武汉市做选址分析，前20个，出图" --execute
 geoclaw-openai nl "商场选址分析，优先可复现QGIS流程" --use-sre --sre-report-out data/outputs/reasoning/nl_e2e_report.md
 
 # 闲聊模式
-geoclaw-openai chat --message "我运行失败了，下一步怎么排查？" --no-ai
-geoclaw-openai chat --message "请你下载景德镇的数据，并分析最适合建设商场的前5个地址，输出报告" --no-ai --execute --use-sre --sre-report-out data/outputs/reasoning/chat_jingdezhen_mall_top5_report.md
+geoclaw-openai chat --message "我运行失败了，下一步怎么排查？" --with-ai
+geoclaw-openai chat --message "请你下载景德镇的数据，并分析最适合建设商场的前5个地址，输出报告" --with-ai --execute --use-sre --sre-report-out data/outputs/reasoning/chat_jingdezhen_mall_top5_report.md
 geoclaw-openai chat --interactive --session-id research_demo
 geoclaw-openai chat --session-id research_demo --message "继续上次方案，给我下一步执行命令"
-geoclaw-openai chat --message "请根据这次对话更新user.md偏好，偏好英文并详细" --no-ai
+geoclaw-openai chat --message "请根据这次对话更新user.md偏好，偏好英文并详细" --with-ai
 
 # 本地工具调用
 geoclaw-openai local --cmd "qgis_process --version" --timeout 30

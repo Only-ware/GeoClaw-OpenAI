@@ -144,16 +144,20 @@ geoclaw-openai nl "商场选址分析，优先可复现工作流" --execute
 geoclaw-openai nl "商场选址分析，优先可复现QGIS流程" --use-sre --sre-report-out data/outputs/reasoning/nl_e2e_report.md
 
 # 闲聊 / 建议模式
-geoclaw-openai chat --message "我运行失败了，下一步怎么排查？" --no-ai
+geoclaw-openai chat --message "我运行失败了，下一步怎么排查？" --with-ai
 geoclaw-openai chat --interactive --session-id onboarding_demo
 geoclaw-openai chat --session-id onboarding_demo --message "继续上一次对话"
-geoclaw-openai chat --message "请根据这次对话更新user.md偏好，偏好英文并详细" --no-ai
+geoclaw-openai chat --message "请根据这次对话更新user.md偏好，偏好英文并详细" --with-ai
 
 # 连续对话（新建/退出/恢复）
 geoclaw-openai chat --interactive --session-id onboarding_demo --new-session
 # 退出关键词：exit / quit / 退出
 geoclaw-openai chat --session-id onboarding_demo --message "继续上一次对话"
 # 会话文件：~/.geoclaw-openai/chat/sessions/onboarding_demo.json
+
+# 30轮连续闲聊回归（不触发任务执行）
+bash scripts/run_dialogue_30_chitchat.sh
+# 易读报告：examples/chat/dialogue_suite_30_rounds_chitchat_20260310.md
 
 # 本地工具执行
 geoclaw-openai local --cmd "qgis_process --version" --timeout 30

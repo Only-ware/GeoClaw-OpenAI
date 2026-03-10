@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [3.2.2] - 2026-03-10
+
+### Added
+- Added 30-round AI chit-chat regression runner:
+  - `scripts/run_dialogue_30_chitchat.sh`
+- Added full 30-round QA dialogue report:
+  - `examples/chat/dialogue_suite_30_rounds_chitchat_full_20260310.md`
+
+### Changed
+- Bumped project/package runtime version to `3.2.2`.
+- Enforced `chat` mode as AI-required by default:
+  - `--no-ai` is disabled for normal usage and hidden from CLI help.
+- Updated skill runner to AI-first default:
+  - `scripts/geoclaw_skill_runner.py` now enables AI summarization by default;
+  - can be disabled per run with `--no-ai`.
+- Updated README and user docs to consistently guide AI-first usage.
+
+### Tested
+- `python3 -m unittest discover -s src/geoclaw_qgis/tests` (118 tests, pass).
+- `bash scripts/run_dialogue_30_chitchat.sh` (PASS=30, FAIL=0, AI mode).
+
 ## [3.2.1] - 2026-03-10
 
 ### Added

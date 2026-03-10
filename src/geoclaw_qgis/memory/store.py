@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import datetime as dt
 import json
+import re
 import shutil
 import uuid
 from pathlib import Path
@@ -14,6 +15,19 @@ from .retrieval import best_matches
 
 def _utc_now() -> str:
     return dt.datetime.now(dt.timezone.utc).isoformat()
+
+
+def _safe_session_key(raw: str) -> str:
+    text = re.sub(r"[^A-Za-z0-9_.-]+", "_", str(raw or "").strip())
+    text = text.strip("._-")
+    return text or "adhoc"
+
+
+def _clip_text(text: str, *, max_chars: int = 240) -> str:
+    value = str(text or "").strip()
+    if len(value) <= max_chars:
+        return value
+    return value[: max(1, max_chars - 3)] + "..."
 
 
 class TaskMemoryStore:
@@ -71,6 +85,149 @@ class TaskMemoryStore:
         }
         self._write_short(task_id, payload)
         return task_id
+
+    def record_chat_turn(
+        self,
+        *,
+        session_id: str,
+        user_message: str,
+        assistant_reply: str,
+        intent: str = "chat",
+        mode: str = "fallback",
+        event_time: str = "",
+        cwd: str = "",
+    ) -> dict[str, Any]:
+        event = _parse_event_time(event_time)
+        day = event.strftime("%Y%m%d")
+        sid = _safe_session_key(session_id)
+        task_id = f"chat-{day}-{sid}"
+        path = self._short_path(task_id)
+        now_iso = event.isoformat()
+
+        if path.exists():
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            except Exception:
+                payload = {}
+        else:
+            payload = {}
+
+        if not isinstance(payload, dict):
+            payload = {}
+
+        if not payload:
+            payload = {
+                "task_id": task_id,
+                "command": "chat_daily",
+                "argv": [f"--session-id={sid}", f"--day={day}"],
+                "cwd": cwd or "",
+                "status": "success",
+                "return_code": 0,
+                "error": "",
+                "created_at": now_iso,
+                "updated_at": now_iso,
+                "finished_at": now_iso,
+                "promoted": False,
+                "review": {},
+                "profile_snapshot": self._memory_profile_snapshot(),
+                "extra": {
+                    "memory_kind": "chat_daily",
+                    "date": day,
+                    "session_id": sid,
+                },
+                "chat_digest": {
+                    "turn_count": 0,
+                    "intents": [],
+                    "modes": [],
+                    "recent_turns": [],
+                    "last_turn_at": "",
+                },
+            }
+
+        digest = payload.get("chat_digest")
+        if not isinstance(digest, dict):
+            digest = {
+                "turn_count": 0,
+                "intents": [],
+                "modes": [],
+                "recent_turns": [],
+                "last_turn_at": "",
+            }
+        turn_count = int(digest.get("turn_count", 0)) + 1
+        digest["turn_count"] = turn_count
+        digest["last_turn_at"] = now_iso
+
+        intents = [str(x).strip() for x in (digest.get("intents") or []) if str(x).strip()]
+        if intent and intent not in intents:
+            intents.append(intent)
+        digest["intents"] = intents[-10:]
+
+        modes = [str(x).strip() for x in (digest.get("modes") or []) if str(x).strip()]
+        if mode and mode not in modes:
+            modes.append(mode)
+        digest["modes"] = modes[-10:]
+
+        turns = [x for x in (digest.get("recent_turns") or []) if isinstance(x, dict)]
+        turns.append(
+            {
+                "ts": now_iso,
+                "user": _clip_text(user_message, max_chars=160),
+                "assistant": _clip_text(assistant_reply, max_chars=200),
+            }
+        )
+        digest["recent_turns"] = turns[-8:]
+
+        payload["chat_digest"] = digest
+        payload["status"] = "success"
+        payload["return_code"] = 0
+        payload["error"] = ""
+        payload["updated_at"] = now_iso
+        payload["finished_at"] = now_iso
+        if not str(payload.get("created_at", "")).strip():
+            payload["created_at"] = now_iso
+        if not str(payload.get("cwd", "")).strip():
+            payload["cwd"] = cwd or ""
+
+        extra = payload.get("extra")
+        if not isinstance(extra, dict):
+            extra = {}
+        extra.update({"memory_kind": "chat_daily", "date": day, "session_id": sid})
+        payload["extra"] = extra
+
+        if not isinstance(payload.get("profile_snapshot"), dict):
+            payload["profile_snapshot"] = self._memory_profile_snapshot()
+
+        self._write_short(task_id, payload)
+        return payload
+
+    def list_chat_daily(self, *, limit: int = 20, session_id: str = "") -> list[dict[str, Any]]:
+        sid = _safe_session_key(session_id) if session_id else ""
+        rows: list[dict[str, Any]] = []
+        for row in self.list_short(limit=max(200, int(limit) * 6)):
+            extra = row.get("extra")
+            if not isinstance(extra, dict):
+                continue
+            if str(extra.get("memory_kind", "")).strip() != "chat_daily":
+                continue
+            if sid and str(extra.get("session_id", "")).strip() != sid:
+                continue
+            rows.append(row)
+            if len(rows) >= max(1, int(limit)):
+                break
+        return rows
+
+    def get_chat_daily_digest(self, *, session_id: str) -> dict[str, Any]:
+        rows = self.list_chat_daily(limit=1, session_id=session_id)
+        if not rows:
+            return {}
+        row = rows[0]
+        digest = row.get("chat_digest")
+        if not isinstance(digest, dict):
+            return {}
+        out = dict(digest)
+        out["task_id"] = str(row.get("task_id", ""))
+        out["date"] = str((row.get("extra") or {}).get("date", ""))
+        return out
 
     def finish_task(
         self,
@@ -389,3 +546,16 @@ class TaskMemoryStore:
         if self._session_profile is None:
             return {}
         return self._session_profile.memory_context()
+
+
+def _parse_event_time(raw: str) -> dt.datetime:
+    text = str(raw or "").strip()
+    if not text:
+        return dt.datetime.now(dt.timezone.utc)
+    try:
+        parsed = dt.datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except Exception:
+        return dt.datetime.now(dt.timezone.utc)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=dt.timezone.utc)
+    return parsed.astimezone(dt.timezone.utc)
