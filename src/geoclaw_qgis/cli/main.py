@@ -1076,10 +1076,53 @@ def _apply_profile_update_via_chat(*, plan: NLPlan) -> dict[str, object]:
         )
 
     session = get_session_profile(force_reload=True)
+    requested_keys = sorted(set(list(set_values.keys()) + list(add_values.keys())))
+    blocked_keys = sorted({str(k).strip().lower() for u in updates for k in (u.get("blocked_keys") or []) if str(k).strip()})
+    ignored_keys = sorted({str(k).strip().lower() for u in updates for k in (u.get("ignored_keys") or []) if str(k).strip()})
+    applied_keys = sorted([k for k in requested_keys if k not in set(blocked_keys + ignored_keys)])
+    summary_only = len(requested_keys) == 0
+
+    lang = str(session.user.preferred_language or "").strip().lower()
+    prefer_cn = any(x in lang for x in ("chinese", "中文", "zh"))
+    if summary_only:
+        if prefer_cn:
+            message = (
+                "已记录本次偏好更新意图，但未识别到可写入的具体字段。"
+                "请明确描述，如：把偏好语言改成英文 / 默认语气改为详细 / 工具优先OpenAI和QGIS。"
+            )
+        else:
+            message = (
+                "Profile intent was recorded, but no writable preference field was recognized. "
+                "Please be explicit, e.g. set preferred language to English / tone to detailed / tools to OpenAI,QGIS."
+            )
+    elif applied_keys:
+        key_text = ", ".join(applied_keys)
+        if prefer_cn:
+            message = f"偏好更新成功，已应用字段：{key_text}。"
+        else:
+            message = f"Profile updated successfully. Applied fields: {key_text}."
+    else:
+        if prefer_cn:
+            message = "未应用任何偏好字段，请检查字段名称是否受支持。"
+        else:
+            message = "No profile fields were applied. Please check whether field names are supported."
+    if blocked_keys:
+        suffix = f"受保护字段被拦截: {', '.join(blocked_keys)}。" if prefer_cn else f" Blocked fields: {', '.join(blocked_keys)}."
+        message += suffix
+    if ignored_keys:
+        suffix = f"忽略字段: {', '.join(ignored_keys)}。" if prefer_cn else f" Ignored fields: {', '.join(ignored_keys)}."
+        message += suffix
+
     return {
         "applied": True,
         "target": target,
         "updates": updates,
+        "requested_keys": requested_keys,
+        "applied_keys": applied_keys,
+        "blocked_keys": blocked_keys,
+        "ignored_keys": ignored_keys,
+        "summary_only": summary_only,
+        "message": message,
         "profile": session.to_dict(),
     }
 
@@ -1282,6 +1325,10 @@ def cmd_chat(args: argparse.Namespace) -> int:
             }
             if profile_update_payload is not None:
                 payload["profile_update"] = profile_update_payload
+                msg = str(profile_update_payload.get("message", "")).strip()
+                if msg:
+                    payload["chat"]["reply"] = msg
+                    payload["chat"]["mode"] = "system"
             if bool(getattr(args, "execute", False)):
                 payload.update(_chat_execution_payload(message=current, session=session, args=args, plan=plan))
             payload["chat_memory"] = _record_chat_turn_memory(
@@ -1368,6 +1415,10 @@ def cmd_chat(args: argparse.Namespace) -> int:
             profile_update_payload = {"applied": False, "error": str(exc)}
     if profile_update_payload is not None:
         payload["profile_update"] = profile_update_payload
+        msg = str(profile_update_payload.get("message", "")).strip()
+        if msg:
+            payload["chat"]["reply"] = msg
+            payload["chat"]["mode"] = "system"
     if bool(getattr(args, "execute", False)):
         payload.update(_chat_execution_payload(message=message, session=session, args=args, plan=plan))
     payload["chat_memory"] = _record_chat_turn_memory(
@@ -1454,6 +1505,17 @@ def cmd_local(args: argparse.Namespace) -> int:
     }
     print(json.dumps(payload, ensure_ascii=False, indent=2))
     return int(return_code)
+
+
+def cmd_web(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    from geoclaw_qgis.web import run_web_server
+
+    return run_web_server(
+        host=str(args.host or "127.0.0.1").strip() or "127.0.0.1",
+        port=int(args.port),
+        open_browser=bool(getattr(args, "open_browser", False)),
+    )
 
 
 def resolve_workspace_root() -> Path:
@@ -2718,6 +2780,12 @@ def build_parser() -> argparse.ArgumentParser:
     local.add_argument("--timeout", type=int, default=120, help="command timeout seconds")
     local.add_argument("--shell", action="store_true", help="run command through shell")
     local.set_defaults(func=cmd_local)
+
+    web = sub.add_parser("web", help="start local web trial UI for GeoClaw")
+    web.add_argument("--host", default="127.0.0.1", help="web bind host")
+    web.add_argument("--port", type=int, default=8765, help="web bind port")
+    web.add_argument("--open-browser", action="store_true", help="open browser after server starts")
+    web.set_defaults(func=cmd_web)
 
     chat = sub.add_parser("chat", help="chat mode (AI-first; requires configured AI provider)")
     chat.add_argument("message", nargs="*", help="chat message text")

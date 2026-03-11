@@ -342,6 +342,95 @@ class TestChatMode(unittest.TestCase):
                 user_after = profile_after.get("user") or {}
                 self.assertEqual(user_after.get("preferred_language"), "English")
                 self.assertEqual(user_after.get("preferred_tone"), "detailed")
+                self.assertIn("preferred_language", profile_update.get("applied_keys") or [])
+                self.assertIn("preferred_tone", profile_update.get("applied_keys") or [])
+                self.assertIn("Profile updated successfully", str(profile_update.get("message", "")))
+                self.assertEqual(payload.get("chat", {}).get("mode"), "system")
+        finally:
+            os.environ.clear()
+            os.environ.update(old_env)
+            cli_main._SESSION_PROFILE = None
+            profile_layers._PROFILE_CACHE = None
+
+    def test_chat_can_update_language_with_natural_phrase(self) -> None:
+        old_env = dict(os.environ)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                home = os.path.join(tmp, "home")
+                os.environ["GEOCLAW_OPENAI_HOME"] = home
+                ensure_profile_layers()
+                cli_main._SESSION_PROFILE = None
+                profile_layers._PROFILE_CACHE = None
+
+                args = argparse.Namespace(
+                    message=["把偏好语言改成英文，以后默认英文回复"],
+                    message_opt="",
+                    with_ai=False,
+                    no_ai=True,
+                    execute=False,
+                    use_sre=False,
+                    sre_report_out="",
+                    interactive=False,
+                    session_id="",
+                    new_session=False,
+                    max_history_turns=8,
+                )
+                buf = io.StringIO()
+                with redirect_stdout(buf):
+                    rc = cli_main.cmd_chat(args)
+                self.assertEqual(rc, 0)
+                payload = json.loads(buf.getvalue())
+                self.assertEqual(payload.get("intent"), "profile")
+                profile_update = payload.get("profile_update") or {}
+                self.assertTrue(profile_update.get("applied"))
+                profile_after = profile_update.get("profile") or {}
+                user_after = profile_after.get("user") or {}
+                self.assertEqual(user_after.get("preferred_language"), "English")
+                self.assertIn("preferred_language", profile_update.get("applied_keys") or [])
+                self.assertIn("preferred_language", str(payload.get("chat", {}).get("reply", "")))
+                self.assertEqual(payload.get("chat", {}).get("mode"), "system")
+        finally:
+            os.environ.clear()
+            os.environ.update(old_env)
+            cli_main._SESSION_PROFILE = None
+            profile_layers._PROFILE_CACHE = None
+
+    def test_chat_profile_update_summary_only_has_guidance(self) -> None:
+        old_env = dict(os.environ)
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                home = os.path.join(tmp, "home")
+                os.environ["GEOCLAW_OPENAI_HOME"] = home
+                ensure_profile_layers()
+                cli_main._SESSION_PROFILE = None
+                profile_layers._PROFILE_CACHE = None
+
+                args = argparse.Namespace(
+                    message=["请更新我的偏好"],
+                    message_opt="",
+                    with_ai=False,
+                    no_ai=True,
+                    execute=False,
+                    use_sre=False,
+                    sre_report_out="",
+                    interactive=False,
+                    session_id="",
+                    new_session=False,
+                    max_history_turns=8,
+                )
+                buf = io.StringIO()
+                with redirect_stdout(buf):
+                    rc = cli_main.cmd_chat(args)
+                self.assertEqual(rc, 0)
+                payload = json.loads(buf.getvalue())
+                self.assertEqual(payload.get("intent"), "profile")
+                profile_update = payload.get("profile_update") or {}
+                self.assertTrue(profile_update.get("applied"))
+                self.assertTrue(profile_update.get("summary_only"))
+                self.assertEqual(profile_update.get("requested_keys"), [])
+                self.assertIn("未识别到可写入的具体字段", str(profile_update.get("message", "")))
+                self.assertEqual(payload.get("chat", {}).get("mode"), "system")
+                self.assertIn("未识别到可写入的具体字段", str(payload.get("chat", {}).get("reply", "")))
         finally:
             os.environ.clear()
             os.environ.update(old_env)

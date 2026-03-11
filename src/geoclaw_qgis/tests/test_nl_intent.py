@@ -63,6 +63,23 @@ class TestNLIntent(unittest.TestCase):
         self.assertIn("--add", plan.cli_args)
         self.assertIn("preferred_tools=Ollama", plan.cli_args)
 
+    def test_profile_language_change_natural_phrase(self) -> None:
+        plan = parse_nl_query("把偏好语言改成英文")
+        self.assertEqual(plan.intent, "profile")
+        self.assertEqual(plan.cli_args[0:2], ["profile", "evolve"])
+        self.assertIn("--set", plan.cli_args)
+        self.assertIn("preferred_language=English", plan.cli_args)
+
+    def test_profile_language_change_with_default_marker(self) -> None:
+        plan = parse_nl_query("以后默认使用中文回复")
+        self.assertEqual(plan.intent, "profile")
+        self.assertIn("preferred_language=Chinese", plan.cli_args)
+
+    def test_chat_english_reply_request_not_persistent_update(self) -> None:
+        plan = parse_nl_query("请用英文介绍一下GeoClaw")
+        self.assertEqual(plan.intent, "chat")
+        self.assertEqual(plan.cli_args[0], "chat")
+
     def test_chat_intent_for_greeting(self) -> None:
         plan = parse_nl_query("你好，今天怎么样")
         self.assertEqual(plan.intent, "chat")

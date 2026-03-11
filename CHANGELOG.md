@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+### Added
+- Added lightweight built-in Web trial UI:
+  - new CLI command: `geoclaw-openai web --host 127.0.0.1 --port 8765 --open-browser`
+  - includes session management (create/switch/delete), error prompt + retry, execution status, and output/report links.
+  - page header includes copyright and GitHub repository link for team trial distribution.
+- Added `web` module and API surface:
+  - `src/geoclaw_qgis/web/app.py`
+  - `GET /api/sessions`, `POST /api/sessions`, `GET /api/sessions/{id}`, `DELETE /api/sessions/{id}`
+  - `POST /api/chat`, `GET /api/file`, `GET /api/health`
+
+### Changed
+- Improved chat profile update feedback:
+  - natural-language preference updates now return explicit system feedback in `chat.reply`.
+  - summary-only profile update now explains why no writable field was recognized and provides examples.
+
+### Tested
+- `python3 -m unittest discover -s src/geoclaw_qgis/tests -q` (127 tests, pass).
+- Manual web smoke:
+  - `python3 -m geoclaw_qgis.cli.main web --host 127.0.0.1 --port 8877`
+  - validated `/api/health` and `/api/sessions`.
+
 ## [3.2.2] - 2026-03-10
 
 ### Added

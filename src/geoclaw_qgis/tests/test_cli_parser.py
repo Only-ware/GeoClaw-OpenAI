@@ -88,6 +88,13 @@ class TestCLIParser(unittest.TestCase):
         self.assertEqual(args.cmd, "ls -la")
         self.assertEqual(args.timeout, 10)
 
+    def test_web_command_exists(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["web", "--host", "127.0.0.1", "--port", "8877"])
+        self.assertEqual(args.command, "web")
+        self.assertEqual(args.host, "127.0.0.1")
+        self.assertEqual(args.port, 8877)
+
     def test_nl_sre_flags(self) -> None:
         parser = build_parser()
         args = parser.parse_args(

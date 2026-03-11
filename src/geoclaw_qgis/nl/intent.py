@@ -316,6 +316,77 @@ def _is_conversational_chat_request(text: str, text_lower: str) -> bool:
     return False
 
 
+def _is_profile_update_request(text: str, text_lower: str) -> bool:
+    # Explicit profile update request.
+    if _contains_any(text_lower, ("profile", "user.md", "soul.md", "用户画像", "偏好", "系统边界", "行为边界")) and _contains_any(
+        text_lower, ("更新", "修改", "同步", "写入", "evolve", "update", "adjust", "调整")
+    ):
+        return True
+
+    # Natural phrasing for user preference updates (without explicit user.md/update keywords).
+    has_user_scope = _contains_any(
+        text_lower,
+        ("profile", "user", "user.md", "用户", "偏好", "默认", "长期", "以后", "从现在开始", "记住"),
+    )
+    has_core_preference_field = _contains_any(
+        text_lower,
+        (
+            "语言",
+            "中文",
+            "英文",
+            "chinese",
+            "english",
+            "语气",
+            "简洁",
+            "详细",
+        ),
+    )
+    has_tool_pref_field = _contains_any(text_lower, ("ollama", "openai", "qwen", "gemini", "qgis")) and _contains_any(
+        text_lower,
+        ("工具", "模型", "provider", "优先", "先用", "默认用", "使用", "tool"),
+    )
+    has_preference_field = has_core_preference_field or has_tool_pref_field
+    has_update_verb = _contains_any(
+        text_lower,
+        (
+            "更新",
+            "修改",
+            "调整",
+            "改",
+            "改成",
+            "改为",
+            "切换",
+            "设为",
+            "设置",
+            "set",
+            "change",
+            "switch",
+            "prefer",
+            "偏好",
+            "默认",
+            "记住",
+        ),
+    )
+    has_persistent_marker = _contains_any(
+        text_lower,
+        (
+            "以后",
+            "今后",
+            "默认",
+            "长期",
+            "从现在开始",
+            "记住",
+            "from now on",
+            "by default",
+            "default",
+            "always",
+        ),
+    )
+    if has_preference_field and has_update_verb and (has_user_scope or has_persistent_marker):
+        return True
+    return False
+
+
 def _build_profile_plan(query: str, text: str, text_lower: str, session: SessionProfile | None = None) -> NLPlan:
     reasons = ["Detected profile-layer update keywords."]
     _append_profile_reasons(reasons, session)
@@ -547,9 +618,7 @@ def parse_nl_query(query: str, session: SessionProfile | None = None) -> NLPlan:
 
     if _contains_any(text_lower, ("执行命令", "运行命令", "local tool", "本地工具", "shell", "/tool ", "terminal")) or text.startswith("!"):
         return _build_local_tool_plan(text, text, session)
-    if _contains_any(text_lower, ("profile", "user.md", "soul.md", "用户画像", "偏好", "系统边界", "行为边界")) and _contains_any(
-        text_lower, ("更新", "修改", "同步", "写入", "evolve", "update", "adjust", "调整")
-    ):
+    if _is_profile_update_request(text, text_lower):
         return _build_profile_plan(text, text, text_lower, session)
     if _contains_any(text_lower, ("update", "updates", "升级", "更新", "拉取最新", "最新版本")):
         return _build_update_plan(text, text_lower, session)
