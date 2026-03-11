@@ -232,9 +232,9 @@ AI 上下文超过阈值时自动压缩，不需要手动开启。
 # 检查是否有更新
 geoclaw-openai update --check-only
 
-# 拉取并更新（默认 origin/main）
+# 拉取并更新（默认自动识别上游分支）
 geoclaw-openai update
 
-# 若仓库主分支是 master，请显式指定
+# 需要覆盖默认识别时再指定
 geoclaw-openai update --branch master
 ```

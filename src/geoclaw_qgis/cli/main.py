@@ -1858,15 +1858,74 @@ def run_checked(cmd: list[str], cwd: Path) -> str:
     return proc.stdout.strip()
 
 
+def _parse_upstream_ref(upstream_ref: str) -> tuple[str, str]:
+    value = str(upstream_ref or "").strip()
+    if not value or "/" not in value:
+        return "", ""
+    parts = value.split("/", 1)
+    remote = parts[0].strip()
+    branch = parts[1].strip()
+    if not remote or not branch:
+        return "", ""
+    return remote, branch
+
+
+def _resolve_update_target(root: Path, remote_arg: str, branch_arg: str) -> tuple[str, str, list[str], bool]:
+    notes: list[str] = []
+    remote_text = str(remote_arg or "").strip()
+    branch_text = str(branch_arg or "").strip()
+    branch_auto = not bool(branch_text)
+
+    if remote_text and branch_text:
+        return remote_text, branch_text, notes, branch_auto
+
+    upstream = ""
+    try:
+        upstream = run_checked(["git", "rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"], root)
+    except Exception:
+        upstream = ""
+
+    up_remote, up_branch = _parse_upstream_ref(upstream)
+    if not remote_text and up_remote:
+        remote_text = up_remote
+        notes.append(f"auto remote from upstream={up_remote}")
+    if not branch_text and up_branch:
+        branch_text = up_branch
+        notes.append(f"auto branch from upstream={up_branch}")
+
+    if not branch_text:
+        try:
+            current_branch = run_checked(["git", "branch", "--show-current"], root)
+        except Exception:
+            current_branch = ""
+        if current_branch and current_branch != "HEAD":
+            branch_text = current_branch
+            notes.append(f"auto branch from current={current_branch}")
+
+    if not remote_text:
+        remote_text = "origin"
+        notes.append("fallback remote=origin")
+    if not branch_text:
+        branch_text = "main"
+        notes.append("fallback branch=main")
+
+    return remote_text, branch_text, notes, branch_auto
+
+
 def cmd_update(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
     root = resolve_workspace_root()
     if not (root / ".git").exists():
         raise RuntimeError(f"workspace is not a git repository: {root}")
 
-    remote_ref = f"{args.remote}/{args.branch}"
+    remote, branch, detect_notes, branch_auto = _resolve_update_target(
+        root,
+        str(getattr(args, "remote", "") or ""),
+        str(getattr(args, "branch", "") or ""),
+    )
+    remote_ref = f"{remote}/{branch}"
     fetch_proc = subprocess.run(
-        ["git", "fetch", args.remote, args.branch],
+        ["git", "fetch", remote, branch],
         cwd=str(root),
         check=False,
         capture_output=True,
@@ -1874,8 +1933,32 @@ def cmd_update(args: argparse.Namespace) -> int:
     )
     fetch_ok = fetch_proc.returncode == 0
     fetch_warning = ""
+    fallback_branch = ""
+    fallback_fetch_detail = ""
     if not fetch_ok:
         fetch_warning = (fetch_proc.stderr or fetch_proc.stdout).strip() or "git fetch failed"
+        if branch_auto:
+            for alt_branch in ("main", "master"):
+                if alt_branch == branch:
+                    continue
+                alt_proc = subprocess.run(
+                    ["git", "fetch", remote, alt_branch],
+                    cwd=str(root),
+                    check=False,
+                    capture_output=True,
+                    text=True,
+                )
+                if alt_proc.returncode == 0:
+                    fallback_branch = alt_branch
+                    fallback_fetch_detail = (
+                        f"auto fallback branch from {branch} to {alt_branch} after fetch failed: {fetch_warning}"
+                    )
+                    fetch_ok = True
+                    fetch_warning = ""
+                    branch = alt_branch
+                    remote_ref = f"{remote}/{branch}"
+                    detect_notes.append(f"auto branch fallback={alt_branch}")
+                    break
 
     local_head = run_checked(["git", "rev-parse", "HEAD"], root)
     remote_head = ""
@@ -1895,8 +1978,10 @@ def cmd_update(args: argparse.Namespace) -> int:
 
     status_payload: dict[str, object] = {
         "workspace": str(root),
-        "remote": args.remote,
-        "branch": args.branch,
+        "remote": remote,
+        "branch": branch,
+        "branch_auto": bool(branch_auto),
+        "detect_notes": detect_notes,
         "local_head": local_head,
         "remote_head": remote_head,
         "ahead": ahead,
@@ -1909,6 +1994,10 @@ def cmd_update(args: argparse.Namespace) -> int:
     }
     if fetch_warning:
         status_payload["warning"] = f"fetch_failed: {fetch_warning}"
+    if fallback_branch:
+        status_payload["fetch_fallback_branch"] = fallback_branch
+    if fallback_fetch_detail:
+        status_payload["fetch_fallback_detail"] = fallback_fetch_detail
 
     if args.check_only or not remote_head or behind == 0:
         print(json.dumps(status_payload, ensure_ascii=False, indent=2))
@@ -1922,9 +2011,9 @@ def cmd_update(args: argparse.Namespace) -> int:
     if dirty and not args.force:
         raise RuntimeError("workspace has uncommitted changes; commit/stash or use --force")
 
-    pull_cmd = ["git", "pull", "--ff-only", args.remote, args.branch]
+    pull_cmd = ["git", "pull", "--ff-only", remote, branch]
     if args.rebase:
-        pull_cmd = ["git", "pull", "--rebase", args.remote, args.branch]
+        pull_cmd = ["git", "pull", "--rebase", remote, branch]
     pull_proc = subprocess.run(pull_cmd, cwd=str(root), check=False, capture_output=True, text=True)
     if pull_proc.returncode != 0:
         raise RuntimeError(
@@ -2932,8 +3021,8 @@ def build_parser() -> argparse.ArgumentParser:
 
     update = sub.add_parser("update", help="self-check updates and optionally pull latest code")
     update.add_argument("--check-only", action="store_true", help="only check if remote has newer commits")
-    update.add_argument("--remote", default="origin", help="git remote name")
-    update.add_argument("--branch", default="main", help="git branch to track")
+    update.add_argument("--remote", default="", help="git remote name (default: auto-detect, fallback origin)")
+    update.add_argument("--branch", default="", help="git branch to track (default: auto-detect)")
     update.add_argument("--rebase", action="store_true", help="use rebase mode when pulling")
     update.add_argument("--force", action="store_true", help="allow pull even when workspace has local changes")
     update.add_argument("--skip-install", action="store_true", help="skip pip editable reinstall after pull")

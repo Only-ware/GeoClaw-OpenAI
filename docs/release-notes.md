@@ -1,5 +1,22 @@
 # GeoClaw-OpenAI Release Notes
 
+## v3.2.4 (2026-03-11)
+
+主要迭代：
+
+1. `update` 命令自动识别分支（稳定性增强）
+   - `geoclaw-openai update` 默认自动识别仓库上游跟踪分支（例如 `origin/master`）。
+   - 若无上游配置，回退当前本地分支；仍不可用时回退 `main/master`。
+   - 减少“默认 main 与实际 master 不一致”导致的更新失败。
+
+2. 安装链路清理增强
+   - `uninstall/reinstall` 增强对历史 editable 安装残留（`.pth` / `dist-info`）的清理。
+   - 降低“已升级但仍加载旧仓库路径”的风险。
+
+3. 版本与文档同步
+   - 包版本与运行时版本升级为 `3.2.4`。
+   - README、CLI Onboard 文档同步更新 `update` 用法。
+
 ## v3.2.3 (2026-03-11)
 
 主要迭代：

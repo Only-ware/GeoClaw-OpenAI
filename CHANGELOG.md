@@ -4,6 +4,27 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [3.2.4] - 2026-03-11
+
+### Added
+- Added update auto-target resolution:
+  - `geoclaw-openai update` now auto-detects remote/branch from upstream tracking ref first.
+  - fallback order: upstream branch -> current local branch -> `main/master`.
+  - update payload now includes `detect_notes` and `branch_auto` for traceability.
+
+### Changed
+- Improved uninstall/reinstall cleanup:
+  - uninstall now uses `--break-system-packages` compatible flow.
+  - uninstall now removes legacy editable artifacts (`__editable__*.pth`, `*dist-info`) to avoid stale import paths.
+- Updated `update` CLI defaults:
+  - `--remote` / `--branch` now default to auto-detect behavior.
+- Bumped project/package runtime version to `3.2.4`.
+
+### Tested
+- `python3 -m unittest discover -s src/geoclaw_qgis/tests -q` (134 tests, pass).
+- Manual check:
+  - `python3 -m geoclaw_qgis.cli.main update --check-only` prints resolved auto branch notes.
+
 ## [3.2.3] - 2026-03-11
 
 ### Added

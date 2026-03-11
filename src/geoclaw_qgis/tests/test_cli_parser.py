@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from geoclaw_qgis.cli.main import (
+    _parse_upstream_ref,
     _apply_sre_execution_plan,
     _apply_sre_task_route,
     _is_sre_route_compatible,
@@ -12,6 +13,19 @@ from geoclaw_qgis.cli.main import (
 
 
 class TestCLIParser(unittest.TestCase):
+    def test_parse_upstream_ref(self) -> None:
+        self.assertEqual(_parse_upstream_ref("origin/master"), ("origin", "master"))
+        self.assertEqual(_parse_upstream_ref("upstream/main"), ("upstream", "main"))
+        self.assertEqual(_parse_upstream_ref(""), ("", ""))
+        self.assertEqual(_parse_upstream_ref("no-slash"), ("", ""))
+
+    def test_update_command_defaults_to_auto_detect(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["update", "--check-only"])
+        self.assertEqual(args.command, "update")
+        self.assertEqual(args.remote, "")
+        self.assertEqual(args.branch, "")
+
     def test_reasoning_command_exists(self) -> None:
         parser = build_parser()
         args = parser.parse_args(["reasoning", "测试任务"])
