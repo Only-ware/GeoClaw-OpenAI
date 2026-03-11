@@ -304,6 +304,36 @@ geoclaw-openai onboard --qgis-process "C:\Program Files\QGIS 3.40.0\bin\qgis_pro
 Windows 下不需要执行 `source ~/.geoclaw-openai/env.sh`。  
 `onboard` 写入的配置会由 GeoClaw CLI 自动读取。
 
+### 3.7 卸载与重装
+
+推荐先用 `--dry-run` 预览动作，再执行真实操作。
+
+```bash
+# CLI 卸载（默认只卸载命令与包，不删配置）
+geoclaw-openai uninstall --dry-run --yes
+geoclaw-openai uninstall --yes
+
+# 连同本地配置/记忆一起清理
+geoclaw-openai uninstall --purge-home --yes
+
+# CLI 重装（卸载 + 安装）
+geoclaw-openai reinstall --dry-run --yes
+geoclaw-openai reinstall --yes
+
+# 跳过卸载，仅重新安装当前工作区 editable 包
+geoclaw-openai reinstall --skip-uninstall --yes
+```
+
+也可直接使用脚本（在仓库根目录）：
+
+```bash
+bash scripts/uninstall_geoclaw_openai.sh --dry-run
+bash scripts/uninstall_geoclaw_openai.sh --purge-home
+
+bash scripts/reinstall_geoclaw_openai.sh --dry-run
+bash scripts/reinstall_geoclaw_openai.sh
+```
+
 #### 3.6.4 Windows 快速自检
 
 ```powershell

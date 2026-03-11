@@ -95,6 +95,22 @@ class TestCLIParser(unittest.TestCase):
         self.assertEqual(args.host, "127.0.0.1")
         self.assertEqual(args.port, 8877)
 
+    def test_uninstall_command_exists(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["uninstall", "--dry-run", "--yes", "--purge-home"])
+        self.assertEqual(args.command, "uninstall")
+        self.assertTrue(args.dry_run)
+        self.assertTrue(args.yes)
+        self.assertTrue(args.purge_home)
+
+    def test_reinstall_command_exists(self) -> None:
+        parser = build_parser()
+        args = parser.parse_args(["reinstall", "--dry-run", "--yes", "--skip-uninstall"])
+        self.assertEqual(args.command, "reinstall")
+        self.assertTrue(args.dry_run)
+        self.assertTrue(args.yes)
+        self.assertTrue(args.skip_uninstall)
+
     def test_nl_sre_flags(self) -> None:
         parser = build_parser()
         args = parser.parse_args(

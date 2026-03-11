@@ -48,6 +48,25 @@ source ~/.geoclaw-openai/env.sh
 
 如使用本地模型，推荐选 `ollama`，默认端点为 `http://127.0.0.1:11434/v1`。
 
+### 3.2 卸载/重装（可选）
+
+```bash
+# 卸载（先预览）
+geoclaw-openai uninstall --dry-run --yes
+geoclaw-openai uninstall --yes
+
+# 重装（卸载 + 安装）
+geoclaw-openai reinstall --dry-run --yes
+geoclaw-openai reinstall --yes
+```
+
+脚本入口（仓库根目录）：
+
+```bash
+bash scripts/uninstall_geoclaw_openai.sh --dry-run
+bash scripts/reinstall_geoclaw_openai.sh --dry-run
+```
+
 ### 3.1 Windows 用户（PowerShell + QGIS）
 
 如果你是 Windows 新手，建议直接按 README 的 Windows 流程操作：

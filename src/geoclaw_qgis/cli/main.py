@@ -6,6 +6,8 @@ import json
 import os
 import re
 import shlex
+import shutil
+import site
 import subprocess
 import sys
 import time
@@ -1507,6 +1509,254 @@ def cmd_local(args: argparse.Namespace) -> int:
     return int(return_code)
 
 
+def _detect_user_bin_for_python(python_bin: str) -> Path:
+    probe = "import os,site;print(site.USER_BASE + ('\\\\\\\\Scripts' if os.name=='nt' else '/bin'))"
+    proc = subprocess.run(
+        [python_bin, "-c", probe],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        out = str(proc.stdout or "").strip()
+        if out:
+            return Path(out).expanduser().resolve()
+    suffix = "Scripts" if os.name == "nt" else "bin"
+    return (Path(site.USER_BASE) / suffix).expanduser().resolve()
+
+
+def _launcher_candidates(user_bin: Path) -> list[Path]:
+    if os.name == "nt":
+        names = [
+            "geoclaw-openai.exe",
+            "geoclaw-openai.cmd",
+            "geoclaw-openai-script.py",
+            "geoclaw-openai",
+        ]
+    else:
+        names = ["geoclaw-openai"]
+    return [user_bin / item for item in names]
+
+
+def _run_uninstall_flow(
+    *,
+    python_bin: str,
+    package: str,
+    purge_home: bool,
+    dry_run: bool,
+    strict: bool,
+) -> tuple[int, dict[str, object]]:
+    user_bin = _detect_user_bin_for_python(python_bin)
+    launchers = _launcher_candidates(user_bin)
+    home_dir = geoclaw_home().resolve()
+    pip_cmd = [python_bin, "-m", "pip", "uninstall", "-y", package]
+
+    payload: dict[str, object] = {
+        "command": "uninstall",
+        "python": python_bin,
+        "package": package,
+        "pip_command": pip_cmd,
+        "user_bin": str(user_bin),
+        "launcher_candidates": [str(p) for p in launchers],
+        "purge_home": bool(purge_home),
+        "home_dir": str(home_dir),
+        "dry_run": bool(dry_run),
+    }
+    if dry_run:
+        payload["next_actions"] = [
+            "run pip uninstall command",
+            "remove launcher candidates if they exist",
+            "remove geoclaw home directory (when --purge-home)",
+        ]
+        return 0, payload
+
+    pip_proc = subprocess.run(pip_cmd, check=False, capture_output=True, text=True)
+    removed_launchers: list[str] = []
+    for launcher in launchers:
+        try:
+            if launcher.exists() or launcher.is_symlink():
+                launcher.unlink()
+                removed_launchers.append(str(launcher))
+        except Exception:
+            continue
+
+    removed_home = False
+    if purge_home and home_dir.exists():
+        shutil.rmtree(home_dir, ignore_errors=True)
+        removed_home = not home_dir.exists()
+
+    payload.update(
+        {
+            "pip_return_code": int(pip_proc.returncode),
+            "pip_stdout": str(pip_proc.stdout or ""),
+            "pip_stderr": str(pip_proc.stderr or ""),
+            "removed_launchers": removed_launchers,
+            "removed_home": removed_home,
+        }
+    )
+    if pip_proc.returncode != 0:
+        payload["warning"] = "pip uninstall returned non-zero; launcher cleanup still applied."
+        if strict:
+            return int(pip_proc.returncode), payload
+    return 0, payload
+
+
+def cmd_uninstall(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    python_bin = str(args.python or os.environ.get("PYTHON", "python3")).strip() or "python3"
+    package = str(args.package or "geoclaw-openai").strip() or "geoclaw-openai"
+    dry_run = bool(getattr(args, "dry_run", False))
+    if not bool(getattr(args, "yes", False)) and not dry_run:
+        ans = input("This will uninstall geoclaw-openai. Type YES to continue: ").strip()
+        if ans != "YES":
+            print(json.dumps({"command": "uninstall", "cancelled": True}, ensure_ascii=False, indent=2))
+            return 0
+
+    rc, payload = _run_uninstall_flow(
+        python_bin=python_bin,
+        package=package,
+        purge_home=bool(getattr(args, "purge_home", False)),
+        dry_run=dry_run,
+        strict=bool(getattr(args, "strict", False)),
+    )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return int(rc)
+
+
+def _run_reinstall_flow(
+    *,
+    python_bin: str,
+    package: str,
+    purge_home: bool,
+    skip_uninstall: bool,
+    dry_run: bool,
+) -> tuple[int, dict[str, object]]:
+    workspace_root = resolve_workspace_root()
+    install_script = workspace_root / "scripts" / "install_geoclaw_openai.sh"
+    payload: dict[str, object] = {
+        "command": "reinstall",
+        "python": python_bin,
+        "package": package,
+        "workspace_root": str(workspace_root),
+        "skip_uninstall": bool(skip_uninstall),
+        "purge_home": bool(purge_home),
+        "dry_run": bool(dry_run),
+    }
+
+    uninstall_payload: dict[str, object] | None = None
+    if not skip_uninstall:
+        uninstall_rc, uninstall_payload = _run_uninstall_flow(
+            python_bin=python_bin,
+            package=package,
+            purge_home=purge_home,
+            dry_run=dry_run,
+            strict=False,
+        )
+        payload["uninstall"] = uninstall_payload
+        if uninstall_rc != 0 and not dry_run:
+            payload["warning"] = "uninstall step returned non-zero; reinstall continues."
+
+    install_cmd_script = ["bash", str(install_script)]
+    install_cmd_pip = [python_bin, "-m", "pip", "install", "--user", "--break-system-packages", "-e", str(workspace_root)]
+    install_cmd_pip_fallback = [
+        python_bin,
+        "-m",
+        "pip",
+        "install",
+        "--user",
+        "--break-system-packages",
+        "--no-build-isolation",
+        "-e",
+        str(workspace_root),
+    ]
+    payload["install_plan"] = {
+        "script_command": install_cmd_script,
+        "pip_command": install_cmd_pip,
+        "pip_fallback_command": install_cmd_pip_fallback,
+    }
+    if dry_run:
+        payload["next_actions"] = [
+            "run uninstall flow unless --skip-uninstall",
+            "run scripts/install_geoclaw_openai.sh when available",
+            "fallback to pip editable install if script is unavailable",
+        ]
+        return 0, payload
+
+    if install_script.exists() and os.name != "nt":
+        env = dict(os.environ)
+        env["PYTHON"] = python_bin
+        proc = subprocess.run(
+            install_cmd_script,
+            cwd=str(workspace_root),
+            check=False,
+            capture_output=True,
+            text=True,
+            env=env,
+        )
+        payload["install"] = {
+            "method": "script",
+            "return_code": int(proc.returncode),
+            "stdout": str(proc.stdout or ""),
+            "stderr": str(proc.stderr or ""),
+        }
+        return int(proc.returncode), payload
+
+    proc = subprocess.run(
+        install_cmd_pip,
+        cwd=str(workspace_root),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if proc.returncode == 0:
+        payload["install"] = {
+            "method": "pip",
+            "return_code": 0,
+            "stdout": str(proc.stdout or ""),
+            "stderr": str(proc.stderr or ""),
+        }
+        return 0, payload
+
+    proc_fb = subprocess.run(
+        install_cmd_pip_fallback,
+        cwd=str(workspace_root),
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    payload["install"] = {
+        "method": "pip",
+        "return_code": int(proc_fb.returncode),
+        "stdout": str(proc_fb.stdout or ""),
+        "stderr": str(proc_fb.stderr or ""),
+        "fallback_used": True,
+        "first_try_stdout": str(proc.stdout or ""),
+        "first_try_stderr": str(proc.stderr or ""),
+    }
+    return int(proc_fb.returncode), payload
+
+
+def cmd_reinstall(args: argparse.Namespace) -> int:
+    bootstrap_runtime_env()
+    python_bin = str(args.python or os.environ.get("PYTHON", "python3")).strip() or "python3"
+    package = str(args.package or "geoclaw-openai").strip() or "geoclaw-openai"
+    dry_run = bool(getattr(args, "dry_run", False))
+    if not bool(getattr(args, "yes", False)) and not dry_run:
+        ans = input("This will reinstall geoclaw-openai. Type YES to continue: ").strip()
+        if ans != "YES":
+            print(json.dumps({"command": "reinstall", "cancelled": True}, ensure_ascii=False, indent=2))
+            return 0
+    rc, payload = _run_reinstall_flow(
+        python_bin=python_bin,
+        package=package,
+        purge_home=bool(getattr(args, "purge_home", False)),
+        skip_uninstall=bool(getattr(args, "skip_uninstall", False)),
+        dry_run=dry_run,
+    )
+    print(json.dumps(payload, ensure_ascii=False, indent=2))
+    return int(rc)
+
+
 def cmd_web(args: argparse.Namespace) -> int:
     bootstrap_runtime_env()
     from geoclaw_qgis.web import run_web_server
@@ -2614,6 +2864,24 @@ def build_parser() -> argparse.ArgumentParser:
     envp = sub.add_parser("env", help="print shell source command")
     envp.set_defaults(func=cmd_env)
 
+    uninstall = sub.add_parser("uninstall", help="uninstall geoclaw-openai from current Python environment")
+    uninstall.add_argument("--python", default="", help="python executable used for pip uninstall")
+    uninstall.add_argument("--package", default="geoclaw-openai", help="package name (default: geoclaw-openai)")
+    uninstall.add_argument("--purge-home", action="store_true", help="remove ~/.geoclaw-openai runtime directory")
+    uninstall.add_argument("--strict", action="store_true", help="fail when pip uninstall returns non-zero")
+    uninstall.add_argument("--yes", action="store_true", help="skip interactive confirmation")
+    uninstall.add_argument("--dry-run", action="store_true", help="print actions without applying")
+    uninstall.set_defaults(func=cmd_uninstall)
+
+    reinstall = sub.add_parser("reinstall", help="reinstall geoclaw-openai (uninstall + install)")
+    reinstall.add_argument("--python", default="", help="python executable used for reinstall")
+    reinstall.add_argument("--package", default="geoclaw-openai", help="package name used in uninstall step")
+    reinstall.add_argument("--skip-uninstall", action="store_true", help="skip uninstall step and only install")
+    reinstall.add_argument("--purge-home", action="store_true", help="purge ~/.geoclaw-openai during uninstall step")
+    reinstall.add_argument("--yes", action="store_true", help="skip interactive confirmation")
+    reinstall.add_argument("--dry-run", action="store_true", help="print actions without applying")
+    reinstall.set_defaults(func=cmd_reinstall)
+
     update = sub.add_parser("update", help="self-check updates and optionally pull latest code")
     update.add_argument("--check-only", action="store_true", help="only check if remote has newer commits")
     update.add_argument("--remote", default="origin", help="git remote name")
@@ -2899,7 +3167,7 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:
         print(f"[PROFILE][WARN] failed to load soul/user profile layers: {exc}", file=sys.stderr)
 
-    if getattr(args, "command", "") == "memory":
+    if getattr(args, "command", "") in {"memory", "uninstall", "reinstall"}:
         return int(args.func(args))
 
     store = TaskMemoryStore(session_profile=get_session_profile())

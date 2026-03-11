@@ -13,6 +13,12 @@ All notable changes to this project are documented in this file.
   - `src/geoclaw_qgis/web/app.py`
   - `GET /api/sessions`, `POST /api/sessions`, `GET /api/sessions/{id}`, `DELETE /api/sessions/{id}`
   - `POST /api/chat`, `GET /api/file`, `GET /api/health`
+- Added uninstall/reinstall support:
+  - new CLI commands: `geoclaw-openai uninstall`, `geoclaw-openai reinstall`
+  - supports `--dry-run`, `--yes`, and optional `--purge-home` for config cleanup.
+  - added shell wrappers:
+    - `scripts/uninstall_geoclaw_openai.sh`
+    - `scripts/reinstall_geoclaw_openai.sh`
 
 ### Changed
 - Improved chat profile update feedback:

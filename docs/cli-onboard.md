@@ -35,6 +35,30 @@ source ~/.geoclaw-openai/env.sh
 - API Key 输入为可见模式，便于核对长 key。
 - 若已配置旧 key，提示中会展示脱敏片段（仅开头+结尾），回车可保持原值。
 
+## 2.1) 卸载与重装
+
+```bash
+# 卸载（预览）
+geoclaw-openai uninstall --dry-run --yes
+
+# 卸载（执行）
+geoclaw-openai uninstall --yes
+
+# 卸载并清理 ~/.geoclaw-openai（配置/记忆）
+geoclaw-openai uninstall --purge-home --yes
+
+# 重装（卸载 + 安装）
+geoclaw-openai reinstall --dry-run --yes
+geoclaw-openai reinstall --yes
+```
+
+脚本方式（仓库根目录）：
+
+```bash
+bash scripts/uninstall_geoclaw_openai.sh --dry-run
+bash scripts/reinstall_geoclaw_openai.sh --dry-run
+```
+
 ## 3) 非交互初始化
 
 ```bash
