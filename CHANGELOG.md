@@ -4,6 +4,8 @@ All notable changes to this project are documented in this file.
 
 ## [Unreleased]
 
+## [3.2.3] - 2026-03-11
+
 ### Added
 - Added lightweight built-in Web trial UI:
   - new CLI command: `geoclaw-openai web --host 127.0.0.1 --port 8765 --open-browser`
@@ -19,17 +21,24 @@ All notable changes to this project are documented in this file.
   - added shell wrappers:
     - `scripts/uninstall_geoclaw_openai.sh`
     - `scripts/reinstall_geoclaw_openai.sh`
+- Added responsive chat viewport behavior in web UI:
+  - chat panel now adapts with browser window size and keeps scrollable content area stable.
+  - session list remains independently scrollable under dynamic viewport changes.
 
 ### Changed
 - Improved chat profile update feedback:
   - natural-language preference updates now return explicit system feedback in `chat.reply`.
   - summary-only profile update now explains why no writable field was recognized and provides examples.
+- Improved web chat latest-message follow behavior:
+  - auto-scroll keeps view at latest message when pinned to bottom.
+  - preserves manual scroll state and re-applies bottom follow on resize.
+- Bumped project/package runtime version to `3.2.3`.
 
 ### Tested
-- `python3 -m unittest discover -s src/geoclaw_qgis/tests -q` (127 tests, pass).
+- `python3 -m unittest discover -s src/geoclaw_qgis/tests -q` (132 tests, pass).
 - Manual web smoke:
   - `python3 -m geoclaw_qgis.cli.main web --host 127.0.0.1 --port 8877`
-  - validated `/api/health` and `/api/sessions`.
+  - validated `/api/health`, `/api/sessions`, responsive resize and latest-message scroll behavior.
 
 ## [3.2.2] - 2026-03-10
 

@@ -7,6 +7,7 @@ import unittest
 from pathlib import Path
 
 from geoclaw_qgis.web.app import (
+    _page_html,
     create_session,
     delete_session,
     extract_output_links,
@@ -16,6 +17,13 @@ from geoclaw_qgis.web.app import (
 
 
 class TestWebApp(unittest.TestCase):
+    def test_page_template_has_responsive_layout_and_bottom_scroll_logic(self) -> None:
+        html = _page_html()
+        self.assertIn("height: 100dvh;", html)
+        self.assertIn("overflow: hidden;", html)
+        self.assertIn("function scrollChatToBottom", html)
+        self.assertIn("window.addEventListener(\"resize\"", html)
+
     def test_session_crud(self) -> None:
         old = dict(os.environ)
         try:

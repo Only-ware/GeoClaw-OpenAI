@@ -1549,13 +1549,17 @@ def _run_uninstall_flow(
     user_bin = _detect_user_bin_for_python(python_bin)
     launchers = _launcher_candidates(user_bin)
     home_dir = geoclaw_home().resolve()
-    pip_cmd = [python_bin, "-m", "pip", "uninstall", "-y", package]
+    uninstall_packages = [package]
+    for legacy in ("geoclaw-qgis", "geoclaw_qgis"):
+        if legacy not in uninstall_packages:
+            uninstall_packages.append(legacy)
 
     payload: dict[str, object] = {
         "command": "uninstall",
         "python": python_bin,
         "package": package,
-        "pip_command": pip_cmd,
+        "pip_command": [python_bin, "-m", "pip", "uninstall", "-y", "--break-system-packages", package],
+        "pip_packages": uninstall_packages,
         "user_bin": str(user_bin),
         "launcher_candidates": [str(p) for p in launchers],
         "purge_home": bool(purge_home),
@@ -1570,7 +1574,26 @@ def _run_uninstall_flow(
         ]
         return 0, payload
 
-    pip_proc = subprocess.run(pip_cmd, check=False, capture_output=True, text=True)
+    pip_attempts: list[dict[str, object]] = []
+    pip_rc = 0
+    for current_package in uninstall_packages:
+        pip_cmd = [python_bin, "-m", "pip", "uninstall", "-y", "--break-system-packages", current_package]
+        proc = subprocess.run(pip_cmd, check=False, capture_output=True, text=True)
+        if proc.returncode != 0 and "no such option: --break-system-packages" in str(proc.stderr or "").lower():
+            pip_cmd = [python_bin, "-m", "pip", "uninstall", "-y", current_package]
+            proc = subprocess.run(pip_cmd, check=False, capture_output=True, text=True)
+        pip_attempts.append(
+            {
+                "package": current_package,
+                "command": pip_cmd,
+                "return_code": int(proc.returncode),
+                "stdout": str(proc.stdout or ""),
+                "stderr": str(proc.stderr or ""),
+            }
+        )
+        if proc.returncode != 0 and pip_rc == 0:
+            pip_rc = int(proc.returncode)
+
     removed_launchers: list[str] = []
     for launcher in launchers:
         try:
@@ -1580,24 +1603,49 @@ def _run_uninstall_flow(
         except Exception:
             continue
 
+    removed_install_artifacts: list[str] = []
+    try:
+        user_site = Path(site.getusersitepackages()).expanduser().resolve()
+        for pattern in (
+            "__editable__.geoclaw_openai-*.pth",
+            "__editable__.geoclaw_qgis-*.pth",
+            "geoclaw_openai-*.dist-info",
+            "geoclaw_qgis-*.dist-info",
+        ):
+            for item in user_site.glob(pattern):
+                try:
+                    if item.is_dir():
+                        shutil.rmtree(item, ignore_errors=True)
+                    else:
+                        item.unlink(missing_ok=True)
+                    removed_install_artifacts.append(str(item))
+                except Exception:
+                    continue
+    except Exception:
+        pass
+
     removed_home = False
     if purge_home and home_dir.exists():
         shutil.rmtree(home_dir, ignore_errors=True)
         removed_home = not home_dir.exists()
 
+    combined_stdout = "\n".join(str(x.get("stdout", "")) for x in pip_attempts if str(x.get("stdout", "")).strip())
+    combined_stderr = "\n".join(str(x.get("stderr", "")) for x in pip_attempts if str(x.get("stderr", "")).strip())
     payload.update(
         {
-            "pip_return_code": int(pip_proc.returncode),
-            "pip_stdout": str(pip_proc.stdout or ""),
-            "pip_stderr": str(pip_proc.stderr or ""),
+            "pip_return_code": int(pip_rc),
+            "pip_stdout": combined_stdout,
+            "pip_stderr": combined_stderr,
+            "pip_attempts": pip_attempts,
             "removed_launchers": removed_launchers,
+            "removed_install_artifacts": removed_install_artifacts,
             "removed_home": removed_home,
         }
     )
-    if pip_proc.returncode != 0:
+    if pip_rc != 0:
         payload["warning"] = "pip uninstall returned non-zero; launcher cleanup still applied."
         if strict:
-            return int(pip_proc.returncode), payload
+            return int(pip_rc), payload
     return 0, payload
 
 

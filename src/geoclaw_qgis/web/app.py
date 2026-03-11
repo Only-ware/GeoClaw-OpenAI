@@ -403,6 +403,7 @@ def _page_html() -> str:
       --ok: #1f8f4a;
       --line: #d8e2ea;
     }
+    html, body { height: 100%; }
     * { box-sizing: border-box; }
     body {
       margin: 0;
@@ -410,15 +411,18 @@ def _page_html() -> str:
       color: var(--ink);
       background: radial-gradient(circle at top right, #d7eff7 0%, var(--bg) 45%, #eef4f7 100%);
       min-height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
     }
     .shell {
       max-width: 1280px;
       margin: 0 auto;
-      padding: 18px;
+      padding: clamp(10px, 2vw, 18px);
       display: grid;
       grid-template-rows: auto 1fr;
       gap: 14px;
-      min-height: 100vh;
+      min-height: 100dvh;
+      height: 100dvh;
     }
     .header {
       background: linear-gradient(135deg, #003845, #005f73);
@@ -435,6 +439,7 @@ def _page_html() -> str:
       grid-template-columns: 320px 1fr;
       gap: 14px;
       min-height: 0;
+      height: 100%;
     }
     .panel {
       background: var(--surface);
@@ -451,8 +456,14 @@ def _page_html() -> str:
       padding: 12px 14px;
       border-bottom: 1px solid var(--line);
     }
+    .sessions-panel {
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
     .session-list {
-      max-height: calc(100vh - 270px);
+      max-height: none;
+      height: 100%;
+      min-height: 0;
       overflow: auto;
       padding: 10px;
       display: grid;
@@ -487,6 +498,7 @@ def _page_html() -> str:
       display: grid;
       grid-template-rows: auto 1fr auto;
       min-height: 0;
+      height: 100%;
     }
     .status-bar {
       display: flex;
@@ -508,6 +520,8 @@ def _page_html() -> str:
       display: grid;
       gap: 12px;
       background: linear-gradient(180deg, #fbfeff 0%, #f6fafc 100%);
+      min-height: 0;
+      overscroll-behavior: contain;
     }
     .msg {
       max-width: 86%;
@@ -529,6 +543,7 @@ def _page_html() -> str:
     textarea {
       width: 100%;
       min-height: 92px;
+      max-height: 32vh;
       resize: vertical;
       border: 1px solid var(--line);
       border-radius: 10px;
@@ -559,9 +574,11 @@ def _page_html() -> str:
     }
     .ok { color: var(--ok); }
     @media (max-width: 980px) {
+      body { overflow: auto; }
+      .shell { height: auto; min-height: 100dvh; }
       .layout { grid-template-columns: 1fr; }
-      .session-list { max-height: 210px; }
-      .chat-panel { min-height: 72vh; }
+      .session-list { max-height: min(32vh, 260px); }
+      .chat-panel { min-height: 60vh; }
     }
   </style>
 </head>
@@ -577,7 +594,7 @@ def _page_html() -> str:
     </header>
 
     <section class=\"layout\">
-      <aside class=\"panel\">
+      <aside class=\"panel sessions-panel\">
         <div class=\"panel-head\">
           <h2>会话管理</h2>
           <button id=\"btn-new\" class=\"primary\">新建会话</button>
@@ -617,9 +634,35 @@ const state = {
   sessionId: "",
   loading: false,
   lastFailedRequest: null,
+  stickToBottom: true,
 };
 
 function byId(id) { return document.getElementById(id); }
+function chatEl() { return byId("chat-scroll"); }
+
+function isNearBottom() {
+  const el = chatEl();
+  if (!el) return true;
+  const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+  return gap <= 32;
+}
+
+function scrollChatToBottom(force = false) {
+  const el = chatEl();
+  if (!el) return;
+  if (force || state.stickToBottom) {
+    el.scrollTop = el.scrollHeight;
+    state.stickToBottom = true;
+  }
+}
+
+function bindChatScroll() {
+  const el = chatEl();
+  if (!el) return;
+  el.addEventListener("scroll", () => {
+    state.stickToBottom = isNearBottom();
+  });
+}
 
 function setStatus({intent = "-", tool = "-", rc = "-"} = {}) {
   byId("st-session").textContent = `Session: ${state.sessionId || "-"}`;
@@ -643,8 +686,8 @@ function addMessage(role, text) {
   const wrap = document.createElement("div");
   wrap.className = `msg ${role}`;
   wrap.textContent = text || "";
-  byId("chat-scroll").appendChild(wrap);
-  byId("chat-scroll").scrollTop = byId("chat-scroll").scrollHeight;
+  chatEl().appendChild(wrap);
+  scrollChatToBottom(true);
 }
 
 function renderLinks(links) {
@@ -721,7 +764,7 @@ async function createSession() {
 async function chooseSession(sessionId) {
   state.sessionId = sessionId;
   const payload = await api(`/api/sessions/${encodeURIComponent(sessionId)}`);
-  byId("chat-scroll").innerHTML = "";
+  chatEl().innerHTML = "";
   const turns = payload.turns || [];
   if (turns.length === 0) {
     addMessage("meta", "当前会话还没有消息。开始提问即可。");
@@ -731,6 +774,7 @@ async function chooseSession(sessionId) {
       addMessage("assistant", t.assistant || "");
     }
   }
+  scrollChatToBottom(true);
   setStatus();
   await loadSessions();
 }
@@ -739,7 +783,7 @@ async function removeSession(sessionId) {
   await api(`/api/sessions/${encodeURIComponent(sessionId)}`, {method: "DELETE"});
   if (state.sessionId === sessionId) {
     state.sessionId = "";
-    byId("chat-scroll").innerHTML = "";
+    chatEl().innerHTML = "";
     addMessage("meta", "会话已删除，请新建会话。");
   }
   await loadSessions();
@@ -816,11 +860,17 @@ byId("input").addEventListener("keydown", async (e) => {
   }
 });
 
+window.addEventListener("resize", () => {
+  window.requestAnimationFrame(() => scrollChatToBottom(false));
+});
+
 (async function init() {
   try {
+    bindChatScroll();
     await loadSessions();
     if (!state.sessionId) await createSession();
     setStatus();
+    scrollChatToBottom(true);
   } catch (err) {
     setError(String(err));
   }
